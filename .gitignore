@@ -16,6 +16,7 @@ test_master.js
 
 # Large binary archives & bundle zips
 *.zip
+*.exe
 public/JARVIS-ULTIMATE.zip
 
 # Python caches

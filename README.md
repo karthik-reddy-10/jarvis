@@ -125,6 +125,34 @@ This automatically verifies dependencies, starts the backend server, and opens `
 
 ---
 
+## 🌐 Public Access & Permanent Cloud Deployment
+
+### Method 1: Instant Secure Public HTTPS Tunnel (Zero Setup)
+To access your local J.A.R.V.I.S. (with all your local Ollama models and local tools) from your phone, tablet, or external laptop:
+1. Double click:
+   ```bat
+   START-PUBLIC-URL.cmd
+   ```
+2. It launches an encrypted Cloudflare Tunnel and gives you a live public HTTPS URL (e.g., `https://xxxx.trycloudflare.com`) that you can open on any device anywhere in the world!
+
+---
+
+### Method 2: Permanent 24/7 Cloud Hosting (Render / Railway)
+To deploy J.A.R.V.I.S. 24/7 in the cloud so it runs even when your computer is off:
+1. Create a free account at [Render.com](https://render.com/).
+2. Click **New +** → **Web Service** → Connect your GitHub repository:
+   ```
+   https://github.com/karthik-reddy-10/jarvis
+   ```
+3. Set the following settings:
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment Variable**: `GOOGLE_API_KEY` = *your Google Gemini API key*
+4. Click **Deploy Web Service**. Render will assign you a permanent URL like `https://jarvis-ultimate.onrender.com`!
+
+---
+
 ## 📁 Repository Structure
 
 ```

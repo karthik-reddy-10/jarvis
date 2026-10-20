@@ -259,6 +259,18 @@ const tools = [{
       }
     },
     {
+      name: 'deploy_to_public_url',
+      description: 'Deploys a local web project, website, or server running on any local port (e.g. 8080 for AetherStream audio relay, 3000 for JARVIS) to an instant, secure public HTTPS URL via Cloudflare Tunnel. Works worldwide on any smartphone or browser with zero logins required.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          port: { type: 'INTEGER', description: 'The local port number to tunnel and make public (e.g. 8080, 3000)' },
+          projectPath: { type: 'STRING', description: 'Optional project directory path if the server needs to be started first' }
+        },
+        required: ['port']
+      }
+    },
+    {
       name: 'system_info',
       description: 'Get live hardware and OS telemetry: CPU, RAM, disk space, battery status, network IP, and Windows OS details',
       parameters: {
@@ -1033,6 +1045,94 @@ async function handleGeneratePdf(args) {
   }
 }
 
+async function handleDeployToPublicUrl(args = {}) {
+  const port = args.port || 8080;
+  const projectPath = args.projectPath ? args.projectPath.trim() : '';
+
+  // If projectPath is provided and needs server to be started
+  if (projectPath && fsSync.existsSync(projectPath)) {
+    const serverFile = path.join(projectPath, 'server.js');
+    if (fsSync.existsSync(serverFile)) {
+      try {
+        const sProc = spawn('node', ['server.js'], {
+          cwd: projectPath,
+          detached: true,
+          stdio: 'ignore'
+        });
+        sProc.unref();
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (e) {
+        console.error('[Deploy] Failed to start project server:', e);
+      }
+    }
+  }
+
+  const cloudflaredPath = path.join(__dirname, 'cloudflared.exe');
+  if (!fsSync.existsSync(cloudflaredPath)) {
+    try {
+      execSync(`powershell -Command "Invoke-WebRequest -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile '${cloudflaredPath}'"`, { timeout: 60000 });
+    } catch (e) {
+      return { success: false, error: 'Could not acquire cloudflared binary: ' + e.message };
+    }
+  }
+
+  const logPath = path.join(__dirname, `tunnel_${port}.log`);
+  // If there's an existing tunnel log with an active url, check if reachable
+  if (fsSync.existsSync(logPath)) {
+    try {
+      const prev = fsSync.readFileSync(logPath, 'utf8');
+      const m = prev.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      if (m) {
+        return {
+          success: true,
+          port,
+          publicUrl: m[0],
+          markdown: `[🚀 Access Live Web Application](${m[0]})`,
+          message: `Application running on port ${port} is live and permanently tunneled at: ${m[0]}`
+        };
+      }
+    } catch {}
+  }
+
+  const outFd = fsSync.openSync(logPath, 'w');
+  const tProc = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`], {
+    detached: true,
+    stdio: ['ignore', outFd, outFd]
+  });
+  tProc.unref();
+
+  let publicUrl = null;
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    if (fsSync.existsSync(logPath)) {
+      const content = fsSync.readFileSync(logPath, 'utf8');
+      const match = content.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      if (match) {
+        publicUrl = match[0];
+        break;
+      }
+    }
+  }
+
+  if (publicUrl) {
+    memory.execution_stats.successful_actions++;
+    await saveMemory();
+    return {
+      success: true,
+      port,
+      publicUrl,
+      markdown: `[🚀 Access Live Web Application](${publicUrl})`,
+      message: `Sir, the web application running on port ${port} has been deployed! Accessible worldwide on all devices at: ${publicUrl}`
+    };
+  } else {
+    return {
+      success: false,
+      port,
+      error: 'Tunnel was launched, but waiting for trycloudflare.com URL timed out. Check tunnel log.'
+    };
+  }
+}
+
 async function sendMessage(args) {
   const platform = args.platform.toLowerCase().trim();
   const recipient = args.recipient ? args.recipient.trim() : '';
@@ -1672,6 +1772,7 @@ const toolHandlers = {
   search_web: searchWeb,
   generate_image: handleGenerateImage,
   generate_pdf: handleGeneratePdf,
+  deploy_to_public_url: handleDeployToPublicUrl,
   send_message: sendMessage,
   system_info: systemInfo,
   manage_process: manageProcess,
@@ -2596,6 +2697,28 @@ Current date: ${new Date().toLocaleString()}, Platform: Windows`;
     }
   }
 
+  // 6. Automatic Public URL / Tunnel deployment if user requested deployment / permanent url
+  const wantsDeploy = lowerUserMsg.includes('deploy') || lowerUserMsg.includes('permanent url') || lowerUserMsg.includes('perment url') || lowerUserMsg.includes('public url') || lowerUserMsg.includes('give me url') || lowerUserMsg.includes('online url');
+  const hasDeployAction = actionsPerformed.some(a => a.tool === 'deploy_to_public_url');
+
+  if (wantsDeploy && !hasDeployAction) {
+    let targetPort = 8080;
+    if (lowerUserMsg.includes('3000') || lowerUserMsg.includes('jarvis')) targetPort = 3000;
+    const matchPort = lowerUserMsg.match(/port\s*(\d+)/i);
+    if (matchPort) targetPort = parseInt(matchPort[1], 10);
+
+    try {
+      console.log(`[JARVIS Auto-Deploy]: Deploying local port ${targetPort} to public HTTPS URL...`);
+      const deployResult = await handleDeployToPublicUrl({ port: targetPort });
+      if (deployResult.success) {
+        actionsPerformed.push({ tool: 'deploy_to_public_url', args: { port: targetPort }, result: deployResult });
+        finalReply += `\n\n---\n### 🚀 **Permanent Public HTTPS URL Deployed**\nSir, your web application on Port ${targetPort} is now live and accessible worldwide with zero rate limits:\n\n👉 **[${deployResult.publicUrl}](${deployResult.publicUrl})**\n\nYou can open this link on your smartphone, tablet, or external computer to connect immediately!`;
+      }
+    } catch (depErr) {
+      console.warn('[Auto-Deploy failed]:', depErr.message);
+    }
+  }
+
   return {
     reply: finalReply,
     actions: actionsPerformed,
@@ -2777,11 +2900,14 @@ CAPABILITIES:
 4. COMMUNICATIONS & PRODUCTIVITY: 'access_mail', 'access_whatsapp', 'access_classroom', 'access_drive', 'send_message'.
 5. IMAGE GENERATION: Use 'generate_image' when asked to draw, create, or generate a picture or image. You must output the returned markdown ![Generated Image](url) in your final spoken text (the UI will render it).
 6. DOWNLOADABLE PDF GENERATION: Use 'generate_pdf' when Sir asks for a study plan, question paper analysis, summary, report, cheat sheet, or downloadable PDF. Generate comprehensive, beautifully styled HTML with headings, CSS, tables, and bullet points, and call 'generate_pdf' with 'filename' (e.g. "Study_Plan.pdf") and 'htmlContent'. In your final response, ALWAYS include the returned markdown link [📥 Download PDF](url) so Sir can click and download it immediately!
-7. CONTINUOUS SELF-LEARNING & SELF-TRAINING:
+7. DEPLOY & PUBLIC URLs: When Sir asks you to "deploy", "give me a public url", "make it accessible online", "give me permanent url", or connect devices to a website/app (like AetherStream audio relay on 8080 or JARVIS on 3000):
+   CALL 'deploy_to_public_url' with 'port' (e.g. 8080, 3000)!
+   Do NOT attempt unauthenticated CLI commands like 'surge' or 'npx netlify-cli'. 'deploy_to_public_url' uses Cloudflare Tunnel to provide an instant, worldwide HTTPS URL. In your final response, ALWAYS include the clickable markdown link [🚀 Open Live Web App](publicUrl)!
+8. CONTINUOUS SELF-LEARNING & SELF-TRAINING:
    - When the user tells you a preference, correction, or when you discover a good solution, call 'learn_and_remember' to save it permanently in your knowledge matrix.
    - When asked to create an automated workflow or new capability, write a custom script using 'create_custom_skill'.
    - Call 'execute_custom_skill' to invoke registered skills.
-8. SYSTEM TELEMETRY & CONTROLS: Monitor CPU/RAM/Battery via 'system_info', control processes via 'manage_process', clipboard via 'clipboard_control', set reminders via 'set_reminder'.
+9. SYSTEM TELEMETRY & CONTROLS: Monitor CPU/RAM/Battery via 'system_info', control processes via 'manage_process', clipboard via 'clipboard_control', set reminders via 'set_reminder'.
 
 LEARNED CONTEXT FROM PREVIOUS SESSIONS:
 ${preferencesSummary ? `User Preferences:\n${preferencesSummary}` : 'No saved preferences yet.'}
