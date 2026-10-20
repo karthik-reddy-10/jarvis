@@ -1,0 +1,3793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S. | Autonomous AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg: #030810;
+      --bg-panel: rgba(6, 18, 32, 0.85);
+      --bg-card: rgba(10, 28, 48, 0.7);
+      --cyan: #00f0ff;
+      --cyan-dim: rgba(0, 240, 255, 0.25);
+      --cyan-glow: rgba(0, 240, 255, 0.5);
+      --blue: #0077ff;
+      --gold: #ffd000;
+      --green: #00ff88;
+      --red: #ff3366;
+      --text: #e1f5fe;
+      --text-dim: #78909c;
+      --border: rgba(0, 240, 255, 0.25);
+      --font-hud: 'Orbitron', monospace;
+      --font-body: 'Rajdhani', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 50% 30%, rgba(0, 119, 255, 0.12), transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.05), transparent 40%),
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+      color: var(--text);
+      font-family: var(--font-body);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scanlines effect */
+    body::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.6;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-core {
+      width: 36px;
+      height: 36px;
+      border: 2px solid var(--cyan);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--cyan-glow), inset 0 0 10px var(--cyan-glow);
+      animation: corePulse 3s infinite alternate ease-in-out;
+    }
+
+    .logo-inner {
+      width: 12px;
+      height: 12px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    .brand-text h1 {
+      font-family: var(--font-hud);
+      font-size: 1.1rem;
+      letter-spacing: 0.25em;
+      color: #fff;
+      text-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .brand-text span {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--cyan);
+      opacity: 0.8;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hud-btn {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      font-family: var(--font-hud);
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+
+    .hud-btn:hover {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+      color: #fff;
+    }
+
+    .hud-btn.active {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+
+    .hud-btn.green-active {
+      background: rgba(0, 255, 136, 0.2);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+    }
+
+    .hud-btn.gold {
+      border-color: rgba(255, 208, 0, 0.4);
+      color: var(--gold);
+    }
+
+    /* Main Grid Layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 330px 1fr 330px;
+      flex: 1;
+      height: calc(100vh - 60px - 38px);
+      gap: 12px;
+      padding: 12px 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    @media (max-width: 1200px) {
+      .main-grid { grid-template-columns: 1fr 310px; }
+      .left-panel { display: none; }
+    }
+
+    @media (max-width: 850px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .right-panel { display: none; }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      position: relative;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 240, 255, 0.04);
+    }
+
+    .panel-title {
+      font-family: var(--font-hud);
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Left Panel: Telemetry & Memory */
+    .telemetry-card {
+      padding: 12px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+    }
+
+    .metric-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .metric-bar-fill {
+      height: 100%;
+      background: var(--cyan);
+      width: 0%;
+      transition: width 0.6s ease;
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    .matrix-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .matrix-item {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      padding: 8px 10px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    .matrix-badge {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 3px;
+      display: block;
+    }
+
+    /* Center: Arc Reactor & Main Chat */
+    .center-panel {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Arc Reactor Visualization */
+    .reactor-container {
+      height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      background: radial-gradient(circle at center, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .reactor {
+      width: 170px;
+      height: 170px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease-out;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+    }
+
+    .ring-1 {
+      width: 160px;
+      height: 160px;
+      border-width: 1px;
+      border-style: dashed;
+      border-color: rgba(0, 240, 255, 0.4);
+      animation: spin 35s linear infinite;
+    }
+
+    .ring-2 {
+      width: 130px;
+      height: 130px;
+      border: 2px solid transparent;
+      border-top-color: var(--cyan);
+      border-bottom-color: var(--cyan);
+      animation: spinReverse 15s linear infinite;
+    }
+
+    .ring-3 {
+      width: 100px;
+      height: 100px;
+      border: 3px solid transparent;
+      border-left-color: var(--blue);
+      border-right-color: var(--cyan);
+      animation: spin 8s linear infinite;
+    }
+
+    .ring-core {
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle, #fff 0%, var(--cyan) 50%, #003366 100%);
+      border-radius: 50%;
+      box-shadow: 0 0 25px var(--cyan), 0 0 50px var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-family: var(--font-hud);
+      font-size: 0.65rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      transition: all 0.3s;
+    }
+
+    .reactor.listening .ring-core {
+      box-shadow: 0 0 45px #00ff88, 0 0 70px #00ff88;
+      background: radial-gradient(circle, #fff 0%, #00ff88 50%, #004422 100%);
+    }
+
+    .reactor.processing .ring-core {
+      box-shadow: 0 0 45px var(--gold), 0 0 70px var(--gold);
+      background: radial-gradient(circle, #fff 0%, var(--gold) 50%, #664400 100%);
+    }
+
+    .reactor.repulsor-blast .ring-core {
+      box-shadow: 0 0 60px #fff, 0 0 100px var(--cyan);
+      background: radial-gradient(circle, #fff 20%, var(--cyan) 70%, #00ffff 100%);
+      transform: scale(1.2);
+    }
+
+    .reactor-status {
+      position: absolute;
+      bottom: 10px;
+      font-family: var(--font-hud);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-shadow: 0 0 8px var(--cyan-glow);
+    }
+
+    /* Live Audio Waveform Canvas inside Reactor */
+    #audioWaveCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.45;
+    }
+
+    /* Chat Messages */
+    .chat-history {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .msg {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      position: relative;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: rgba(0, 119, 255, 0.2);
+      border: 1px solid rgba(0, 119, 255, 0.4);
+      color: #fff;
+    }
+
+    .msg.jarvis {
+      align-self: flex-start;
+      background: rgba(0, 240, 255, 0.07);
+      border: 1px solid var(--border);
+      color: var(--text);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.03);
+    }
+
+    .msg-sender {
+      font-family: var(--font-hud);
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      margin-bottom: 4px;
+      color: var(--cyan);
+      opacity: 0.8;
+    }
+
+    .msg.user .msg-sender { color: #80b3ff; }
+
+    /* Action log cards */
+    .action-card {
+      margin-top: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 3px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .action-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--cyan);
+      border-radius: 2px;
+      font-size: 0.65rem;
+      margin-bottom: 4px;
+    }
+
+    .action-badge.success { color: var(--green); background: rgba(0, 255, 136, 0.15); }
+
+    /* Input Bar */
+    .input-bar {
+      padding: 12px 16px;
+      background: rgba(6, 18, 32, 0.95);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cmd-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      padding: 10px 14px;
+      border-radius: 3px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .cmd-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+    }
+
+    .mic-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1.15rem;
+      position: relative;
+    }
+
+    .mic-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      box-shadow: 0 0 15px var(--cyan-glow);
+      transform: scale(1.04);
+    }
+
+    .mic-btn.recording {
+      background: rgba(255, 51, 102, 0.35);
+      border-color: var(--red);
+      color: #fff;
+      box-shadow: 0 0 25px rgba(255, 51, 102, 0.8), inset 0 0 10px rgba(255, 51, 102, 0.5);
+      animation: pulseRecord 0.9s infinite alternate;
+      transform: scale(1.08);
+    }
+
+    /* Tactical Voice Status & Live Transcript Bar */
+    .voice-status-bar {
+      padding: 10px 16px;
+      background: rgba(4, 18, 36, 0.98);
+      border-top: 1px solid var(--cyan);
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      animation: fadeIn 0.25s ease;
+      box-shadow: 0 -4px 20px rgba(0, 240, 255, 0.2);
+    }
+
+    .voice-status-bar.active {
+      display: flex;
+    }
+
+    .voice-status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .voice-status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-hud);
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      color: var(--cyan);
+    }
+
+    .voice-pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 10px var(--red);
+      animation: pulseRecord 0.7s infinite alternate;
+    }
+
+    .voice-transcript-preview {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      border-radius: 4px;
+      border-left: 3px solid var(--cyan);
+      min-height: 24px;
+      max-height: 80px;
+      overflow-y: auto;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .voice-transcript-preview.empty {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .voice-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .voice-action-btn {
+      font-family: var(--font-hud);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      padding: 5px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: rgba(0, 240, 255, 0.08);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+
+    .voice-action-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      color: #fff;
+    }
+
+    .voice-action-btn.exec {
+      border-color: var(--green);
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--green);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+      font-weight: 600;
+    }
+
+    .voice-action-btn.exec:hover {
+      background: rgba(0, 255, 136, 0.35);
+      box-shadow: 0 0 18px rgba(0, 255, 136, 0.7);
+    }
+
+    .voice-action-btn.cancel {
+      border-color: var(--red);
+      background: rgba(255, 51, 102, 0.15);
+      color: var(--red);
+    }
+
+    /* Microphone Permission Alert Banner */
+    .hud-alert-banner {
+      background: rgba(255, 51, 102, 0.15);
+      border: 1px solid var(--red);
+      border-radius: 4px;
+      padding: 10px 16px;
+      margin: 10px 16px 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 0 20px rgba(255, 51, 102, 0.25);
+      animation: fadeIn 0.3s ease;
+      z-index: 50;
+    }
+
+    .hud-alert-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Voice Volume Slider in Header */
+    .hud-volume-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .hud-volume-control:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+    }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      width: 65px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+      accent-color: var(--cyan);
+    }
+
+    /* Holographic Attachment Button */
+    .attach-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+    }
+
+    .attach-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow);
+      color: #fff;
+    }
+
+    .attach-btn.has-file {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(255, 208, 0, 0.15);
+      box-shadow: 0 0 15px rgba(255, 208, 0, 0.5);
+    }
+
+    /* File Attachment Preview Strip */
+    .file-preview-strip {
+      padding: 8px 16px;
+      background: rgba(4, 14, 26, 0.98);
+      border-top: 1px solid rgba(0, 240, 255, 0.2);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .file-preview-strip.active {
+      display: flex;
+    }
+
+    .file-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid var(--cyan);
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #fff;
+      max-width: 75%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-pill-size {
+      color: var(--gold);
+      font-size: 0.68rem;
+      background: rgba(255, 208, 0, 0.15);
+      padding: 1px 6px;
+      border-radius: 2px;
+    }
+
+    .file-pill-remove {
+      background: transparent;
+      border: none;
+      color: var(--red);
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    .file-pill-remove:hover {
+      color: #fff;
+    }
+
+    .upload-progress-wrap {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .upload-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      box-shadow: 0 0 8px var(--cyan);
+      transition: width 0.15s ease-out;
+    }
+
+    /* Drag and Drop Full Holographic Overlay */
+    .drag-drop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 10, 22, 0.9);
+      border: 2px dashed var(--cyan);
+      box-shadow: inset 0 0 50px rgba(0, 240, 255, 0.35);
+      z-index: 500;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      animation: fadeIn 0.15s ease;
+    }
+
+    .drag-drop-overlay.active {
+      display: flex;
+    }
+
+    .drag-drop-hud-box {
+      border: 1px solid var(--cyan);
+      background: rgba(6, 20, 38, 0.95);
+      padding: 24px 36px;
+      border-radius: 6px;
+      text-align: center;
+      box-shadow: 0 0 35px var(--cyan-glow);
+    }
+
+    /* Right Panel: Quick Commands & Gestures */
+    .quick-list {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .quick-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      padding: 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-card:hover {
+      border-color: var(--cyan);
+      background: rgba(0, 240, 255, 0.1);
+      transform: translateX(4px);
+    }
+
+    .quick-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+
+    .quick-desc {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* HOLOGRAPHIC HAND GESTURE HUD WINDOW */
+    .gesture-hud-container {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 320px;
+      height: 240px;
+      background: rgba(4, 12, 24, 0.85);
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
+      border-radius: 4px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .gesture-hud-container.active {
+      display: flex;
+    }
+
+    .hud-corner {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: var(--cyan);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-corner.tl { top: 4px; left: 4px; border-top: 2px solid; border-left: 2px solid; }
+    .hud-corner.tr { top: 4px; right: 4px; border-top: 2px solid; border-right: 2px solid; }
+    .hud-corner.bl { bottom: 4px; left: 4px; border-bottom: 2px solid; border-left: 2px solid; }
+    .hud-corner.br { bottom: 4px; right: 4px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .gesture-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* Mirror camera */
+    }
+
+    .gesture-hud-header {
+      position: absolute;
+      top: 6px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 12;
+      font-family: var(--font-hud);
+      font-size: 0.65rem;
+      color: var(--cyan);
+      text-shadow: 0 0 6px var(--cyan);
+      pointer-events: none;
+    }
+
+    .gesture-telemetry-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 4px 8px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      border-radius: 2px;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    /* Hidden Camera Video Input */
+    #webcamVideo {
+      display: none;
+    }
+
+    /* Modals */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      background: #081626;
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 30px var(--cyan-dim);
+      border-radius: 4px;
+      width: 90%;
+      max-width: 520px;
+      padding: 24px;
+    }
+
+    .modal-title {
+      font-family: var(--font-hud);
+      font-size: 1rem;
+      color: var(--cyan);
+      margin-bottom: 16px;
+      letter-spacing: 0.15em;
+    }
+
+    /* Bottom Status Bar */
+    footer {
+      height: 38px;
+      background: rgba(4, 12, 22, 0.95);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    /* Animations */
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
+    @keyframes corePulse {
+      0% { box-shadow: 0 0 10px var(--cyan-glow); }
+      100% { box-shadow: 0 0 25px var(--cyan-glow); }
+    }
+    @keyframes pulseRecord {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header with Controls -->
+  <header>
+    <a href="#" class="brand">
+      <div class="logo-core">
+        <div class="logo-inner"></div>
+      </div>
+      <div class="brand-text">
+        <h1>J.A.R.V.I.S.</h1>
+        <span>AUTONOMOUS COGNITIVE SYSTEM · V4.9</span>
+      </div>
+    </a>
+
+    <div class="header-actions">
+      <!-- Hands-Free Voice Listening Toggle -->
+      <button class="hud-btn" id="handsFreeBtn" onclick="toggleHandsFreeListening()">
+        <span id="handsFreeIcon">🎙️</span> <span id="handsFreeLabel">HANDS-FREE: OFF</span>
+      </button>
+
+      <!-- Holographic Hand Gesture HUD Toggle -->
+      <button class="hud-btn" id="gestureHudBtn" onclick="toggleGestureHud()">
+        <span>🖐️</span> <span id="gestureLabel">GESTURE HUD: OFF</span>
+      </button>
+
+      <!-- The FRIDAY Protocol Screen Vision Toggle -->
+      <button class="hud-btn" id="fridayVisionBtn" onclick="toggleFridayVisionHud()">
+        <span>👁️</span> <span id="fridayVisionLabel">FRIDAY VISION</span>
+      </button>
+
+      <!-- Autonomous Browser Pilot Matrix Toggle -->
+      <button class="hud-btn" id="browserMatrixBtn" onclick="toggleBrowserMatrixHud()">
+        <span>🌐</span> <span id="browserMatrixLabel">BROWSER PILOT</span>
+      </button>
+
+      <!-- Voice Output Toggle -->
+      <button class="hud-btn" id="voiceToggleBtn" onclick="toggleVoiceOutput()">
+        <span id="voiceIcon">🔊</span> <span id="voiceLabel">VOICE ON</span>
+      </button>
+
+      <!-- Voice Volume Booster & Control -->
+      <div class="hud-volume-control" title="J.A.R.V.I.S. Audio Output Volume (Boosted)">
+        <span style="font-size:0.85rem;">🔊</span>
+        <input type="range" class="volume-slider" id="voiceVolumeSlider" min="0" max="1" step="0.05" value="1" oninput="setVoiceVolume(this.value)" title="Volume Slider (100% Boosted)">
+        <span id="voiceVolumePercent" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--cyan); min-width: 32px;">100%</span>
+      </div>
+
+      <!-- AI Engine & Model Selector Button -->
+      <button class="hud-btn gold" id="engineSelectorBtn" onclick="openKeyModal()" title="Switch AI Engine: Google Gemini Cloud vs. Ollama Local">
+        <span id="engineIcon">⚡</span> <span id="engineLabel">ENGINE: GEMINI</span>
+      </button>
+
+      <button class="hud-btn" onclick="clearSession()">
+        <span>🗑️</span> CLEAR
+      </button>
+    </div>
+  </header>
+
+  <!-- Main 3-Column HUD Grid -->
+  <div class="main-grid">
+
+    <!-- Left: Telemetry & Memory Matrix -->
+    <div class="panel left-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🧠</span> MEMORY & SELF-TRAINING
+        </div>
+        <span class="matrix-badge" id="evolveCount">0 CYCLES</span>
+      </div>
+
+      <div class="telemetry-card">
+        <div class="metric-row">
+          <span>Learned Preferences</span>
+          <span id="prefCount">0</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="prefBar" style="width: 25%"></div></div>
+
+        <div class="metric-row">
+          <span>Heuristic Lessons</span>
+          <span id="heuristicCount">0</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="heuristicBar" style="width: 45%"></div></div>
+
+        <div class="metric-row">
+          <span>Custom Skills Evolved</span>
+          <span id="skillCount">0</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="skillBar" style="width: 20%"></div></div>
+
+        <div style="margin-top: 10px; font-size: 0.72rem; color: var(--gold); display: flex; align-items: center; gap: 6px;">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--gold); box-shadow:0 0 6px var(--gold); animation: pulseRecord 1s infinite;"></span>
+          AUTONOMOUS SELF-TRAINING: CONTINUOUS
+        </div>
+      </div>
+
+      <div class="panel-header" style="border-top: 1px solid var(--border);">
+        <div class="panel-title" style="font-size: 0.7rem;">
+          <span>⚡</span> RECENT MEMORY STREAM
+        </div>
+      </div>
+
+      <div class="matrix-list" id="memoryList">
+        <div class="matrix-item">
+          <span class="matrix-badge">System Core</span>
+          JARVIS continuous self-learning loop active. Any instruction, habit, or preference is indexed permanently.
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Arc Reactor & Main Command Chat -->
+    <div class="panel center-panel">
+      
+      <!-- Drag & Drop Full Holographic HUD Overlay -->
+      <div class="drag-drop-overlay" id="dragDropOverlay">
+        <div class="drag-drop-hud-box">
+          <div style="font-family: var(--font-hud); font-size: 1.1rem; color: var(--cyan); margin-bottom: 8px;">
+            ⚡ J.A.R.V.I.S. INTEL INGESTION ⚡
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px;">
+            DROP FILES OF ANY SIZE TO LOAD INTO CORE MATRIX
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--gold);">
+            ZIP ARCHIVES (DEEP CODE EXTRACTION) · IMAGES · VIDEOS · DOCUMENTS
+          </div>
+        </div>
+      </div>
+
+      <!-- Arc Reactor Visualizer -->
+      <div class="reactor-container" id="reactorBox">
+        <canvas id="audioWaveCanvas"></canvas>
+        <div class="reactor" id="arcReactor">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+          <div class="ring-core" id="reactorCoreText">JARVIS</div>
+        </div>
+        <div class="reactor-status" id="reactorStatusText">SYSTEM READY · STANDING BY</div>
+      </div>
+
+      <!-- Microphone Permission & Hardware Alert Banner -->
+      <div class="hud-alert-banner" id="micPermissionAlert" style="display:none;">
+        <div class="hud-alert-content">
+          <span style="font-size: 1.4rem;">⚠️</span>
+          <div>
+            <div id="micAlertTitle" style="font-family: var(--font-hud); color: #fff; font-size: 0.8rem; letter-spacing: 0.1em; margin-bottom: 2px;">MICROPHONE ACCESS BLOCKED</div>
+            <div id="micAlertMsg" style="font-size: 0.8rem; color: var(--text-dim); line-height: 1.3;">Click the lock icon in your browser address bar and set Microphone to "Allow".</div>
+          </div>
+        </div>
+        <button class="hud-btn" onclick="dismissMicAlert()" style="padding: 4px 10px; font-size: 0.65rem;">DISMISS</button>
+      </div>
+
+      <!-- Brave Browser Neural Audio Alert Banner -->
+      <div class="hud-alert-banner" id="braveEngineAlert" style="display:none; border-color: rgba(255, 140, 0, 0.5); background: rgba(255, 120, 0, 0.08);">
+        <div class="hud-alert-content">
+          <span style="font-size: 1.3rem;">🦁</span>
+          <div>
+            <div style="font-family: var(--font-hud); color: #ff9933; font-size: 0.78rem; letter-spacing: 0.1em; margin-bottom: 2px;">BRAVE BROWSER COMPATIBILITY ENGAGED</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim); line-height: 1.3;">Brave shields block Google's speech recognition by default. J.A.R.V.I.S. Universal Neural Audio Bridge is routing your microphone directly through Gemini Neural Core! Speak freely — auto-executes immediately when you pause.</div>
+          </div>
+        </div>
+        <button class="hud-btn" onclick="document.getElementById('braveEngineAlert').style.display='none'" style="padding: 4px 10px; font-size: 0.65rem;">ACKNOWLEDGE</button>
+      </div>
+
+      <!-- Chat History Stream -->
+      <div class="chat-history" id="chatStream">
+        <div class="msg jarvis">
+          <div class="msg-sender">J.A.R.V.I.S.</div>
+          Good day, Sir. All systems are operational. You now have full hands-free voice control, holographic hand tracking, file uploads of any size (ZIP archives, images, videos), Google Classroom, Google Drive, and secure on-demand email/WhatsApp access. How may I assist you today?
+        </div>
+      </div>
+
+      <!-- Attached File Preview Strip (Supports Multiple Files) -->
+      <div class="file-preview-strip" id="filePreviewStrip">
+        <div class="file-pills-container" id="filePillsContainer" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-height: 120px; overflow-y: auto; flex: 1;">
+          <!-- Dynamically populated holographic file pills -->
+        </div>
+        <div class="upload-progress-wrap" id="uploadProgressWrap" style="display:none; min-width: 140px;">
+          <div class="upload-progress-fill" id="uploadProgressFill"></div>
+        </div>
+        <span id="uploadStatusText" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--cyan); display:none; white-space: nowrap;">UPLOADING 0%</span>
+        <button id="clearAllFilesBtn" onclick="removeAllAttachedFiles()" style="display:none; background:rgba(255,0,85,0.15); border:1px solid var(--red); color:var(--red); font-family:var(--font-mono); font-size:0.68rem; padding:4px 8px; border-radius:3px; cursor:pointer; flex-shrink: 0;" title="Clear all attachments">CLEAR ALL</button>
+      </div>
+
+      <!-- Tactical Voice Status & Live Transcript Bar -->
+      <div class="voice-status-bar" id="voiceStatusBar">
+        <div class="voice-status-header">
+          <div class="voice-status-indicator">
+            <span class="voice-pulse-dot"></span>
+            <span id="voiceStatusText">LISTENING FOR INSTRUCTION...</span>
+          </div>
+          <div class="voice-actions-row">
+            <span class="auto-exec-badge" id="autoExecBadge" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--green); display:none; font-weight: bold; letter-spacing: 0.08em;">⚡ AUTO-EXECUTING...</span>
+            <button class="voice-action-btn cancel" onclick="cancelVoiceRecognition()" title="Cancel voice input">✖ CANCEL</button>
+          </div>
+        </div>
+        <div class="voice-transcript-preview empty" id="voiceTranscriptPreview">
+          Speak your instruction — automatically executes immediately when you stop speaking...
+        </div>
+      </div>
+
+      <!-- Command Input Bar -->
+      <div class="input-bar">
+        <button class="attach-btn" id="fridaySnapBtn" onclick="triggerFridaySnap()" title="The FRIDAY Protocol: Snap & Analyze Active Screen (OCR)">
+          👁️
+        </button>
+        <button class="attach-btn" id="attachBtn" onclick="triggerFileInput()" title="Attach multiple files of any size (ZIP, images, videos, documents)">
+          📎
+        </button>
+        <input type="file" id="fileUploadInput" multiple style="display:none;" onchange="handleFileSelection(event)" />
+        <button class="mic-btn" id="micBtn" onclick="togglePushToTalk()" title="Click to speak (Push to talk)">
+          🎤
+        </button>
+        <input 
+          type="text" 
+          class="cmd-input" 
+          id="cmdInput" 
+          placeholder="Speak or type instruction — e.g. 'Analyze my screen', 'Check Classroom to-do', 'Create Google Doc'..." 
+          autocomplete="off"
+        />
+        <button class="hud-btn" onclick="submitUserCommand()" style="height: 44px; padding: 0 20px;">
+          SEND
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Quick Commands & Gestures Guide -->
+    <div class="panel right-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>⚡</span> IRON MAN CONTROLS
+        </div>
+      </div>
+
+      <div class="quick-list">
+        <div class="quick-card" onclick="triggerFridaySnap()">
+          <div class="quick-title">👁️ The FRIDAY Protocol</div>
+          <div class="quick-desc">Desktop Screen Vision: reads WhatsApp, Gmail & Classroom questions</div>
+        </div>
+
+        <div class="quick-card" onclick="toggleBrowserMatrixHud()">
+          <div class="quick-title">🌐 Autonomous Browser Pilot</div>
+          <div class="quick-desc">Direct Chrome/Edge control: DOM parser, click, type & auto-navigation</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Jarvis, use browser automation to solve the active Google Skills lab: start the lab, extract credentials, launch Incognito Google Cloud Console, and log in.')">
+          <div class="quick-title">🧪 Google Skills Lab Auto-Pilot</div>
+          <div class="quick-desc">Starts lab, grabs credentials, injects into Incognito GCP Console</div>
+        </div>
+
+        <div class="quick-card" onclick="toggleHandsFreeListening()">
+          <div class="quick-title">🎙️ Hands-Free Voice Mode</div>
+          <div class="quick-desc">Speak naturally anytime — Jarvis auto-listens, executes, and responds</div>
+        </div>
+
+        <div class="quick-card" onclick="toggleGestureHud()">
+          <div class="quick-title">🖐️ Holographic Hand Tracking</div>
+          <div class="quick-desc">Iron Man hand tracking HUD via webcam with real-time skeleton overlay</div>
+        </div>
+
+        <div class="quick-card" onclick="triggerFileInput()">
+          <div class="quick-title">📎 Ingest File (Any Size)</div>
+          <div class="quick-desc">Upload ZIP codebases, images, videos & ask JARVIS anything</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Check my Google Classroom pending assignments and to-do list')">
+          <div class="quick-title">🎓 Classroom To-Do List</div>
+          <div class="quick-desc">View pending homework, upcoming deadlines & assignments</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Check my missing or overdue Google Classroom assignments')">
+          <div class="quick-title">⚠️ Missing Assignments</div>
+          <div class="quick-desc">Directly audit missing or overdue coursework in Classroom</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Open my Google Classroom assignment calendar')">
+          <div class="quick-title">📅 Classroom Schedule</div>
+          <div class="quick-desc">Open submission deadlines calendar for all classes</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Open Google Drive to search my study files')">
+          <div class="quick-title">📁 Google Drive Hub</div>
+          <div class="quick-desc">Manage, search, and access cloud files and lectures</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Create a new Google Doc for my study notes')">
+          <div class="quick-title">📝 New Google Doc</div>
+          <div class="quick-desc">Instantly open a fresh document for note taking & assignments</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Create a new Google Spreadsheet')">
+          <div class="quick-title">📊 New Google Sheet</div>
+          <div class="quick-desc">Instantly instantiate a new cloud spreadsheet</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Open my Gmail inbox')">
+          <div class="quick-title">✉️ Gmail (Explicit Command)</div>
+          <div class="quick-desc">Secure on-demand access to inbox and unread emails</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Open WhatsApp Web')">
+          <div class="quick-title">💬 WhatsApp (Explicit Command)</div>
+          <div class="quick-desc">Secure on-demand messaging and chat interface</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Open Google in another tab')">
+          <div class="quick-title">🌐 Open in Another Tab</div>
+          <div class="quick-desc">Instantly launches sites in new browser tabs</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Build a futuristic responsive cyber-weather website on my Desktop and open it')">
+          <div class="quick-title">🚀 Build Website / App</div>
+          <div class="quick-desc">Scaffolds multi-file projects on PC with live browser preview</div>
+        </div>
+
+        <div class="quick-card" onclick="runQuick('Check hardware telemetry: CPU load, RAM, and Battery')">
+          <div class="quick-title">📊 System Telemetry</div>
+          <div class="quick-desc">Live CPU, RAM, Disk, OS & Battery diagnostics</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOLOGRAPHIC HAND GESTURE HUD (IRON MAN FLOATING SKELETON DISPLAY) -->
+    <div class="gesture-hud-container" id="gestureHudWindow">
+      <div class="hud-corner tl"></div>
+      <div class="hud-corner tr"></div>
+      <div class="hud-corner bl"></div>
+      <div class="hud-corner br"></div>
+      
+      <div class="gesture-hud-header">
+        <span>● MARK VII · GESTURE HUD</span>
+        <span id="gestureFps">30 FPS</span>
+      </div>
+
+      <canvas class="gesture-canvas" id="gestureCanvas" width="320" height="240"></canvas>
+      <video id="webcamVideo" width="320" height="240" playsinline></video>
+
+      <div class="gesture-telemetry-badge">
+        <span id="gestureName">GESTURE: SCANNING...</span>
+        <span id="gesturePinch">REPULSOR: READY</span>
+      </div>
+    </div>
+
+    <!-- HOLOGRAPHIC FRIDAY PROTOCOL SCREEN VISION HUD -->
+    <div class="gesture-hud-container" id="fridayVisionHudWindow" style="top: 270px; height: 320px;">
+      <div class="hud-corner tl"></div>
+      <div class="hud-corner tr"></div>
+      <div class="hud-corner bl"></div>
+      <div class="hud-corner br"></div>
+      
+      <div class="gesture-hud-header">
+        <span>● FRIDAY PROTOCOL · SCREEN VISION</span>
+        <button onclick="toggleFridayVisionHud()" style="background:transparent;border:none;color:var(--cyan);cursor:pointer;font-size:0.75rem;">✖</button>
+      </div>
+
+      <!-- Live optical feed canvas / preview -->
+      <div style="position:relative; width:100%; height:180px; background:#020a14; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+        <canvas id="fridayCanvas" width="320" height="180" style="width:100%; height:100%; object-fit:contain;"></canvas>
+        <video id="fridayScreenVideo" autoplay playsinline style="display:none;"></video>
+        <div id="fridayPlaceholder" style="position:absolute; text-align:center; padding:12px; pointer-events:none;">
+          <div style="font-size: 2rem; margin-bottom: 4px;">👁️</div>
+          <div style="font-family: var(--font-hud); font-size: 0.7rem; color: var(--cyan);">OPTICAL OCR SCANNER</div>
+          <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 4px;">Share display or click capture to see active screen</div>
+        </div>
+      </div>
+
+      <!-- Tactical Control Strip -->
+      <div style="padding: 6px 10px; background: rgba(0,0,0,0.7); display:flex; gap:6px; justify-content:space-between; align-items:center;">
+        <button class="hud-btn" id="streamScreenBtn" onclick="toggleScreenShareStream()" style="padding:4px 8px; font-size:0.6rem;">
+          🖥️ SHARE TAB / DISPLAY
+        </button>
+        <button class="hud-btn" onclick="captureAndAnalyzeVision()" style="padding:4px 8px; font-size:0.6rem; background:rgba(0,240,255,0.25); color:#fff;">
+          📸 CAPTURE & OCR
+        </button>
+      </div>
+
+      <!-- Quick Analysis Bar -->
+      <div style="padding: 4px 10px 8px 10px; background: rgba(0,0,0,0.7); display:flex; gap:4px; overflow-x:auto;">
+        <button class="hud-btn" onclick="triggerFridaySnap('Read all unread or visible WhatsApp messages on my screen and summarize who sent them and what they say.')" style="padding:3px 6px; font-size:0.55rem; white-space:nowrap;">
+          💬 WHATSAPP OCR
+        </button>
+        <button class="hud-btn" onclick="triggerFridaySnap('Parse the homework questions visible on my Google Classroom screen and explain step-by-step solutions.')" style="padding:3px 6px; font-size:0.55rem; white-space:nowrap;">
+          🎓 CLASSROOM OCR
+        </button>
+        <button class="hud-btn" onclick="triggerFridaySnap('Summarize the emails visible on my screen and list key action items.')" style="padding:3px 6px; font-size:0.55rem; white-space:nowrap;">
+          ✉️ EMAIL OCR
+        </button>
+      </div>
+    </div>
+
+    <!-- HOLOGRAPHIC AUTONOMOUS BROWSER AUTOMATION & LAB PILOT HUD -->
+    <div class="gesture-hud-container" id="browserMatrixHudWindow" style="display:none; top: 120px; right: 20px; width: 440px; height: 530px; z-index: 1000; flex-direction: column;">
+      <div class="hud-corner tl"></div>
+      <div class="hud-corner tr"></div>
+      <div class="hud-corner bl"></div>
+      <div class="hud-corner br"></div>
+      
+      <div class="gesture-hud-header" style="justify-content: space-between;">
+        <span style="display:flex; align-items:center; gap:6px;">
+          <span>🌐</span> AUTONOMOUS BROWSER PILOT
+          <span id="browserPilotStateBadge" style="font-size:0.6rem; padding:1px 6px; border-radius:4px; background:rgba(0,255,136,0.2); color:var(--green); border:1px solid var(--green);">STANDBY</span>
+        </span>
+        <button onclick="toggleBrowserMatrixHud()" style="background:transparent;border:none;color:var(--cyan);cursor:pointer;font-size:0.75rem;">✖</button>
+      </div>
+
+      <!-- Navigation & Action URL Bar -->
+      <div style="padding: 8px 10px; background: rgba(0,0,0,0.8); display:flex; gap:6px; border-bottom: 1px solid var(--border);">
+        <input 
+          type="text" 
+          id="browserUrlInput" 
+          placeholder="Enter URL (e.g. cloudskillsboost.google, console.cloud.google.com)..." 
+          style="flex:1; background:rgba(0,240,255,0.06); border:1px solid var(--border); color:#fff; padding:6px 10px; font-family:var(--font-mono); font-size:0.75rem; border-radius:4px; outline:none;" 
+          value="https://www.cloudskillsboost.google"
+          onkeydown="if(event.key==='Enter') executeBrowserNavigate()"
+        />
+        <button class="hud-btn" onclick="executeBrowserNavigate()" style="padding:4px 10px; font-size:0.65rem; background:rgba(0,240,255,0.2); color:#fff;">
+          GO ➔
+        </button>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div style="padding: 6px 10px; background: rgba(0,0,0,0.6); display:flex; gap:6px; flex-wrap:wrap; border-bottom: 1px solid var(--border);">
+        <button class="hud-btn gold" onclick="executeBrowserSolveLab()" style="padding:4px 8px; font-size:0.62rem;" title="Autonomous Lab Solver: clicks Start Lab, grabs credentials, opens Incognito GCP Console, runs commands in Cloud Shell, verifies progress">
+          🧪 AUTO-SOLVE LAB
+        </button>
+        <button class="hud-btn" onclick="executeBrowserStartLab()" style="padding:4px 8px; font-size:0.62rem; color:var(--green); border-color:var(--green);" title="Pierce Shadow DOM and trigger Start Lab button directly">
+          ⚡ START LAB
+        </button>
+        <button class="hud-btn" onclick="executeBrowserCheckProgress()" style="padding:4px 8px; font-size:0.62rem; color:var(--cyan);" title="Audit and click all Check My Progress buttons">
+          ✅ CHECK PROGRESS
+        </button>
+        <button class="hud-btn" onclick="executeBrowserExtractDom()" style="padding:4px 8px; font-size:0.62rem;">
+          🎯 EXTRACT DOM
+        </button>
+        <button class="hud-btn" onclick="executeBrowserScreenshot()" style="padding:4px 8px; font-size:0.62rem;">
+          📸 SCREENSHOT
+        </button>
+        <button class="hud-btn" onclick="executeBrowserClose()" style="padding:4px 8px; font-size:0.62rem; color:var(--red);">
+          ✖ CLOSE
+        </button>
+      </div>
+
+      <!-- Active Page Meta Strip -->
+      <div style="padding: 4px 10px; background: rgba(0,20,40,0.8); display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:0.68rem; color:var(--cyan); border-bottom: 1px solid rgba(0,240,255,0.1);">
+        <span id="browserPageTitle" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No page loaded</span>
+        <span id="browserIncognitoBadge" style="color:var(--gold);">[STANDARD]</span>
+      </div>
+
+      <!-- Detected Credentials Box (If any) -->
+      <div id="browserCredentialsBox" style="display:none; padding:8px 10px; background:rgba(255,170,0,0.12); border-bottom:1px solid var(--gold);">
+        <div style="font-family:var(--font-hud); font-size:0.7rem; color:var(--gold); margin-bottom:4px;">🔐 DETECTED LAB CREDENTIALS</div>
+        <div style="font-family:var(--font-mono); font-size:0.68rem; color:#fff; line-height:1.4;" id="browserCredentialsDetails"></div>
+        <button class="hud-btn gold" onclick="injectDetectedCredentials()" style="margin-top:6px; padding:3px 8px; font-size:0.6rem;">
+          ⚡ INJECT & LOGIN TO GCP CONSOLE (INCOGNITO)
+        </button>
+      </div>
+
+      <!-- Interactive Elements / DOM List -->
+      <div id="browserDomContent" style="flex:1; overflow-y:auto; padding:10px; font-family:var(--font-mono); font-size:0.7rem; background:#010914;">
+        <div style="color:var(--text-dim); text-align:center; padding-top:40px;">
+          Click "GO ➔" or ask Jarvis: "Open Google Skills and start the lab".<br>
+          Interactive DOM elements will map here automatically.
+        </div>
+      </div>
+
+      <!-- Screenshot Preview Drawer -->
+      <div id="browserScreenshotDrawer" style="display:none; border-top:1px solid var(--border); padding:6px; background:#000; text-align:center;">
+        <img id="browserScreenshotImg" src="" style="max-width:100%; max-height:130px; object-fit:contain; border-radius:4px; border:1px solid var(--border);" />
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Status Bar -->
+  <footer>
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusMessage">CORE STATUS: ONLINE · LOOPBACK 127.0.0.1:3000</span>
+    </div>
+    <div id="liveTelemetry">HANDS-FREE: STANDBY · GESTURE HUD: READY</div>
+  </footer>
+
+  <!-- AI Engine & API Configuration Modal -->
+  <div class="modal-overlay" id="keyModal">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-title" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+        <span>⚙️ AI ENGINE & COGNITION MATRIX</span>
+        <span id="ollamaStatusPill" style="font-size: 0.65rem; font-family: var(--font-mono); padding: 3px 8px; border-radius: 3px; background: rgba(0, 240, 255, 0.1); border: 1px solid var(--cyan); color: var(--cyan);">CHECKING ENGINES...</span>
+      </div>
+
+      <!-- Engine Selector Tabs / Radio Cards -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <!-- Gemini Card -->
+        <div id="cardGemini" onclick="selectEngineOption('gemini')" style="cursor: pointer; border: 1px solid var(--cyan); background: rgba(0, 240, 255, 0.1); padding: 12px; border-radius: 4px; transition: all 0.2s;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <strong style="color: #fff; font-size: 0.85rem; font-family: var(--font-hud);">⚡ GOOGLE GEMINI</strong>
+            <input type="radio" name="aiEngineRadio" id="radioGemini" value="gemini" checked>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-dim); line-height: 1.3;">
+            Cloud-accelerated intelligence with Gemini 3.5 & 3.6 Flash. Requires API key.
+          </div>
+        </div>
+
+        <!-- Ollama Card -->
+        <div id="cardOllama" onclick="selectEngineOption('ollama')" style="cursor: pointer; border: 1px solid var(--border); background: rgba(4, 12, 24, 0.6); padding: 12px; border-radius: 4px; transition: all 0.2s;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <strong style="color: #fff; font-size: 0.85rem; font-family: var(--font-hud);">🦙 OLLAMA LOCAL</strong>
+            <input type="radio" name="aiEngineRadio" id="radioOllama" value="ollama">
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-dim); line-height: 1.3;">
+            100% Offline on your laptop. Zero rate limits, completely private & free.
+          </div>
+        </div>
+      </div>
+
+      <!-- Gemini Settings Section -->
+      <div id="geminiConfigSection" style="margin-bottom: 16px;">
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan); margin-bottom: 6px;">
+          GOOGLE GEMINI API KEY:
+        </label>
+        <div style="position: relative;">
+          <input 
+            type="password" 
+            id="apiKeyInput" 
+            class="cmd-input" 
+            placeholder="AIzaSy... (Paste new key here)" 
+            style="width: 100%; padding-right: 75px;" 
+          />
+          <button type="button" onclick="toggleKeyVisibility()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--cyan); font-family: var(--font-mono); font-size: 0.7rem; cursor: pointer;">SHOW</button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);">
+          <span id="currentKeyPreview">Current Key: None configured</span>
+          <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--cyan); text-decoration: underline;">Get free key at Google AI Studio ↗</a>
+        </div>
+      </div>
+
+      <!-- Ollama Settings Section -->
+      <div id="ollamaConfigSection" style="margin-bottom: 16px; display: none;">
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan); margin-bottom: 6px;">
+          SELECT LOCAL OLLAMA MODEL:
+        </label>
+        <select id="ollamaModelSelect" class="cmd-input" style="width: 100%; cursor: pointer;">
+          <option value="llama3.2:3b">llama3.2:3b (Ultra Fast · Function Calling & PC Automation · Recommended)</option>
+          <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (Deep Coding & Logical Reasoning)</option>
+          <option value="llava:7b">llava:7b (Multimodal Visual Vision Perception)</option>
+        </select>
+        <div style="margin-top: 8px; font-size: 0.72rem; color: var(--text-dim); line-height: 1.4;">
+          💡 <em>Tip:</em> J.A.R.V.I.S. automatically bridges vision: when using LLaMA or Qwen, uploaded images and screen captures are automatically parsed via LLaVA for seamless multimodal perception!
+        </div>
+      </div>
+
+      <!-- Modal Footer Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="hud-btn" type="button" onclick="testCurrentEngineConnection()" style="border-color: rgba(0, 240, 255, 0.4);">
+          <span>🔍</span> TEST CONNECTION
+        </button>
+        <div style="display: flex; gap: 10px;">
+          <button class="hud-btn" type="button" onclick="closeKeyModal()">CANCEL</button>
+          <button class="hud-btn" type="button" onclick="saveEngineConfig()" style="background: var(--cyan); color: #000; font-weight: bold; border-color: var(--cyan);">
+            SAVE & ACTIVATE ENGINE
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Audio Context & Sound Effects Synthesis
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playBeep(freq = 800, duration = 0.08) {
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.04, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch {}
+    }
+
+    function playRepulsorSound() {
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      } catch {}
+    }
+
+    // ==========================================
+    // VOICE SYNTHESIS & VOLUME CONTROL
+    // ==========================================
+    let voiceEnabled = true;
+    let jarvisVolume = 1.0; // 100% Volume (Boosted)
+    let availableVoices = [];
+    let isJarvisSpeaking = false;
+    let ttsKeepAliveTimer = null;
+
+    function loadVoices() {
+      if (!('speechSynthesis' in window)) return;
+      availableVoices = window.speechSynthesis.getVoices();
+    }
+    loadVoices();
+    if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    function getBestJarvisVoice() {
+      if (!availableVoices || !availableVoices.length) loadVoices();
+      if (!availableVoices || !availableVoices.length) return null;
+
+      // 1. British English Voice (Paul Bettany J.A.R.V.I.S. cadence)
+      const british = availableVoices.find(v => 
+        (v.lang.includes('en-GB') || v.lang.includes('en_GB')) && 
+        (v.name.includes('George') || v.name.includes('Hazel') || v.name.includes('Oliver') || v.name.includes('Google UK English Male') || v.name.includes('UK'))
+      );
+      if (british) return british;
+
+      // 2. High-volume resonant Windows/Google English voices
+      const resonant = availableVoices.find(v => 
+        v.lang.startsWith('en') && 
+        (v.name.includes('David') || v.name.includes('Mark') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('Google US English') || v.name.includes('Natural'))
+      );
+      if (resonant) return resonant;
+
+      // 3. Fallback to any English voice
+      const anyEn = availableVoices.find(v => v.lang.startsWith('en'));
+      return anyEn || availableVoices[0] || null;
+    }
+
+    function setVoiceVolume(val) {
+      jarvisVolume = Math.max(0, Math.min(1.0, parseFloat(val)));
+      const pct = Math.round(jarvisVolume * 100);
+      const pctEl = document.getElementById('voiceVolumePercent');
+      if (pctEl) pctEl.textContent = pct + '%';
+      const sliderEl = document.getElementById('voiceVolumeSlider');
+      if (sliderEl) sliderEl.value = jarvisVolume;
+
+      if (jarvisVolume === 0 && voiceEnabled) {
+        toggleVoiceOutput();
+      } else if (jarvisVolume > 0 && !voiceEnabled) {
+        toggleVoiceOutput();
+      }
+      playBeep(900 + pct * 3, 0.05);
+    }
+
+    function toggleVoiceOutput() {
+      voiceEnabled = !voiceEnabled;
+      const label = document.getElementById('voiceLabel');
+      const icon = document.getElementById('voiceIcon');
+      if (label) label.textContent = voiceEnabled ? 'VOICE ON' : 'VOICE OFF';
+      if (icon) icon.textContent = voiceEnabled ? '🔊' : '🔇';
+      if (!voiceEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        isJarvisSpeaking = false;
+      }
+      playBeep(voiceEnabled ? 1000 : 400);
+    }
+
+    function speakJarvis(text) {
+      if (!voiceEnabled || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      // Clean markdown, links, code blocks for pristine TTS speech
+      let cleanText = text
+        .replace(/```[\s\S]*?```/g, 'Code block executed.')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/[*_#~>]/g, '')
+        .replace(/https?:\/\/\S+/g, 'link')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .trim();
+
+      if (cleanText.length > 550) {
+        cleanText = cleanText.slice(0, 520) + '... and more details are available on your screen.';
+      }
+
+      const utter = new SpeechSynthesisUtterance(cleanText);
+      // MAXIMUM AUDIO VOLUME AND CLARITY
+      utter.volume = jarvisVolume; // 1.0 = 100% volume
+      utter.rate = 1.02; // crisp natural cadence
+      utter.pitch = 1.0; // resonant, clear frequency (boosted from 0.88)
+
+      const voice = getBestJarvisVoice();
+      if (voice) utter.voice = voice;
+
+      utter.onstart = () => {
+        isJarvisSpeaking = true;
+        // Pause microphone while Jarvis is speaking to prevent acoustic feedback loop
+        pauseMicRecognitionForSpeech();
+        setReactorState('speaking', 'J.A.R.V.I.S. TRANSMITTING AUDIO');
+
+        // Chrome keep-alive hack for TTS
+        if (ttsKeepAliveTimer) clearInterval(ttsKeepAliveTimer);
+        ttsKeepAliveTimer = setInterval(() => {
+          if (window.speechSynthesis && window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          } else {
+            clearInterval(ttsKeepAliveTimer);
+          }
+        }, 8000);
+      };
+
+      utter.onend = () => {
+        isJarvisSpeaking = false;
+        if (ttsKeepAliveTimer) clearInterval(ttsKeepAliveTimer);
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        resumeMicRecognitionAfterSpeech();
+      };
+
+      utter.onerror = (err) => {
+        console.warn('SpeechSynthesis error:', err);
+        isJarvisSpeaking = false;
+        if (ttsKeepAliveTimer) clearInterval(ttsKeepAliveTimer);
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        resumeMicRecognitionAfterSpeech();
+      };
+
+      // Play pleasant high-frequency acoustic chime right before speech
+      playBeep(1400, 0.08);
+      window.speechSynthesis.speak(utter);
+    }
+
+    // ==========================================
+    // MICROPHONE VOICE RECOGNITION & NEURAL AUDIO BRIDGE (BRAVE, CHROME, EDGE, FIREFOX)
+    // ==========================================
+    let recognition = null;
+    let isListening = false;
+    let handsFreeActive = false;
+    let micStream = null;
+    let audioAnalyser = null;
+    let audioDataArray = null;
+    let voiceSilenceTimer = null;
+    let speechSessionText = '';
+    let isStoppingRequested = false;
+    let isExecutingVoice = false;
+    let userSpokeInThisSession = false;
+    let acousticSpeechDetected = false;
+    let lastVoiceDetectedTime = 0;
+
+    // MediaRecorder Audio Bridge for Brave Browser & Universal Capture
+    let mediaRecorder = null;
+    let recordedAudioChunks = [];
+    let isRecordingAudio = false;
+    let recorderMimeType = 'audio/webm';
+    let isNeuralTranscribing = false;
+
+    // Automatic Brave Browser Detection
+    let isBraveBrowser = false;
+    if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+      navigator.brave.isBrave().then(val => {
+        isBraveBrowser = !!val;
+        if (isBraveBrowser) {
+          console.log('[JARVIS] Brave Browser detected. Engaging Universal Neural Audio Bridge.');
+          const banner = document.getElementById('braveEngineAlert');
+          if (banner) banner.style.display = 'flex';
+        }
+      });
+    }
+
+    // Tactical Alert Controls
+    function showMicPermissionAlert(title, message) {
+      const alertBox = document.getElementById('micPermissionAlert');
+      if (alertBox) {
+        document.getElementById('micAlertTitle').textContent = title;
+        document.getElementById('micAlertMsg').textContent = message;
+        alertBox.style.display = 'flex';
+      }
+    }
+
+    function dismissMicAlert() {
+      const alertBox = document.getElementById('micPermissionAlert');
+      if (alertBox) alertBox.style.display = 'none';
+    }
+
+    async function ensureMicrophoneAccess() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showMicPermissionAlert('BROWSER MEDIA API NOT AVAILABLE', 'Your browser does not support getUserMedia. Please use Google Chrome, Microsoft Edge, or Brave on Windows.');
+          return false;
+        }
+        if (!micStream || !micStream.active) {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+        }
+        dismissMicAlert();
+        initAudioWaveVisualizerWithStream(micStream);
+        return true;
+      } catch (err) {
+        console.error('Microphone access denied:', err);
+        showMicPermissionAlert(
+          'MICROPHONE ACCESS BLOCKED',
+          'Please click the lock/tune icon 🔒 in your browser address bar (next to localhost:3000), set Microphone to "Allow", and try again.'
+        );
+        return false;
+      }
+    }
+
+    function startMediaRecording() {
+      if (!micStream) return;
+      try {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+          let mime = 'audio/webm;codecs=opus';
+          if (!MediaRecorder.isTypeSupported(mime)) {
+            mime = 'audio/webm';
+            if (!MediaRecorder.isTypeSupported(mime)) mime = '';
+          }
+          recorderMimeType = mime || 'audio/webm';
+          const options = mime ? { mimeType: mime } : {};
+          mediaRecorder = new MediaRecorder(micStream, options);
+          recordedAudioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedAudioChunks.push(e.data);
+            }
+          };
+
+          mediaRecorder.start(100); // 100ms timeslices for rapid chunk capture
+          isRecordingAudio = true;
+        } else if (mediaRecorder.state === 'paused') {
+          mediaRecorder.resume();
+          isRecordingAudio = true;
+        }
+      } catch (err) {
+        console.warn('[JARVIS MediaRecorder] Setup notice:', err.message);
+      }
+    }
+
+    function stopMediaRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try {
+          mediaRecorder.stop();
+        } catch {}
+      }
+      isRecordingAudio = false;
+    }
+
+    // Create or re-create SpeechRecognition instance
+    function getOrCreateRecognition() {
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        return null;
+      }
+      try {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+
+        rec.onstart = () => {
+          isListening = true;
+          isExecutingVoice = false;
+          userSpokeInThisSession = false;
+          acousticSpeechDetected = false;
+          lastVoiceDetectedTime = Date.now();
+          document.getElementById('micBtn').classList.add('recording');
+          document.getElementById('micBtn').title = 'Listening... Speak your instruction';
+          setReactorState('listening', 'MICROPHONE ACTIVE · LISTENING FOR INSTRUCTIONS...');
+          showVoiceStatusBar('');
+          playBeep(1200, 0.08);
+        };
+
+        rec.onresult = (e) => {
+          if (isExecutingVoice || isNeuralTranscribing) return;
+
+          let interim = '';
+          let final = '';
+          for (let i = 0; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) {
+              final += e.results[i][0].transcript + ' ';
+            } else {
+              interim += e.results[i][0].transcript;
+            }
+          }
+
+          const combined = (final + interim).trim();
+          if (combined) {
+            // Barge-In handling
+            if (isJarvisSpeaking && handsFreeActive) {
+              const lower = combined.toLowerCase();
+              if (lower.includes('jarvis') || lower.includes('stop')) {
+                console.log('[Barge-In] Interrupting TTS!');
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                isJarvisSpeaking = false;
+              } else {
+                return; // ignore background noise while speaking if not wake word
+              }
+            } else if (isJarvisSpeaking) {
+              return; // block if not hands-free
+            }
+
+            speechSessionText = combined;
+            userSpokeInThisSession = true;
+            acousticSpeechDetected = true;
+            lastVoiceDetectedTime = Date.now();
+            document.getElementById('cmdInput').value = speechSessionText;
+            showVoiceStatusBar(speechSessionText);
+
+            const isFinal = e.results[e.results.length - 1].isFinal;
+            clearTimeout(voiceSilenceTimer);
+
+            // Instant auto-execution on silence
+            const waitMs = isFinal ? 1200 : 1500;
+            voiceSilenceTimer = setTimeout(() => {
+              if (speechSessionText.trim() && !isExecutingVoice && !isNeuralTranscribing) {
+                triggerImmediateVoiceExecution();
+              }
+            }, waitMs);
+          }
+        };
+
+        rec.onerror = (e) => {
+          console.warn('Speech recognition notice:', e.error);
+          if (e.error === 'not-allowed') {
+            showMicPermissionAlert(
+              'MICROPHONE PERMISSION BLOCKED',
+              'Browser blocked microphone access. Click the lock icon in the address bar and select "Allow" for Microphone.'
+            );
+            stopSpeechListening(false);
+          }
+        };
+
+        rec.onend = () => {
+          if (speechSessionText.trim() && !isExecutingVoice && !isJarvisSpeaking && !isStoppingRequested && !isNeuralTranscribing) {
+            triggerImmediateVoiceExecution();
+            return;
+          }
+          if (acousticSpeechDetected && !speechSessionText && !isExecutingVoice && !isStoppingRequested && !isNeuralTranscribing) {
+            triggerNeuralAudioTranscription();
+            return;
+          }
+          if (handsFreeActive && !isStoppingRequested && !isExecutingVoice && !isNeuralTranscribing) {
+            setTimeout(() => {
+              if (handsFreeActive && !isListening && !isExecutingVoice) {
+                startSpeechListening();
+              }
+            }, 300);
+          } else if (!isJarvisSpeaking && !speechSessionText && !isNeuralTranscribing) {
+            setReactorState('idle', 'SYSTEM READY · STANDING BY');
+            hideVoiceStatusBar();
+            document.getElementById('micBtn').classList.remove('recording');
+            document.getElementById('micBtn').title = 'Click to speak (Push to talk)';
+            isListening = false;
+          }
+        };
+
+        return rec;
+      } catch (err) {
+        console.warn('SpeechRec instantiation notice:', err);
+        return null;
+      }
+    }
+
+    async function startSpeechListening() {
+      if (isListening || isExecutingVoice || isNeuralTranscribing) return;
+      if (isJarvisSpeaking) {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        isJarvisSpeaking = false;
+      }
+      const ok = await ensureMicrophoneAccess();
+      if (!ok) return;
+
+      isStoppingRequested = false;
+      userSpokeInThisSession = false;
+      acousticSpeechDetected = false;
+      lastVoiceDetectedTime = Date.now();
+
+      isListening = true;
+      document.getElementById('micBtn').classList.add('recording');
+      document.getElementById('micBtn').title = 'Listening... Speak your instruction';
+      setReactorState('listening', 'MICROPHONE ACTIVE · LISTENING FOR INSTRUCTIONS...');
+      showVoiceStatusBar('');
+      playBeep(1200, 0.08);
+
+      // Start raw audio recording for universal Brave/Chrome/Edge bridge
+      startMediaRecording();
+
+      // Also start SpeechRecognition for live interim preview where supported
+      try {
+        if (!recognition) {
+          recognition = getOrCreateRecognition();
+        }
+        if (recognition) {
+          recognition.start();
+        }
+      } catch (err) {
+        console.log('[JARVIS Voice] Browser native speech recognition bypassed or already active.');
+      }
+    }
+
+    function stopSpeechListening(clearSession = true) {
+      isStoppingRequested = true;
+      clearTimeout(voiceSilenceTimer);
+      if (recognition) {
+        try { recognition.stop(); } catch {}
+      }
+      stopMediaRecording();
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('recording');
+      document.getElementById('micBtn').title = 'Click to speak (Push to talk)';
+      if (clearSession) {
+        speechSessionText = '';
+        userSpokeInThisSession = false;
+        acousticSpeechDetected = false;
+        recordedAudioChunks = [];
+        hideVoiceStatusBar();
+      }
+    }
+
+    function pauseMicRecognitionForSpeech() {
+      if (handsFreeActive) {
+        console.log('[Barge-In] Mic remains active during TTS due to Hands-Free mode.');
+        return; 
+      }
+      clearTimeout(voiceSilenceTimer);
+      if (recognition && isListening) {
+        try { recognition.stop(); } catch {}
+      }
+      stopMediaRecording();
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('recording');
+      hideVoiceStatusBar();
+    }
+
+    function resumeMicRecognitionAfterSpeech() {
+      if (handsFreeActive && !isJarvisSpeaking) {
+        setTimeout(() => {
+          if (handsFreeActive && !isListening && !isJarvisSpeaking && !isExecutingVoice && !isNeuralTranscribing) {
+            speechSessionText = '';
+            userSpokeInThisSession = false;
+            acousticSpeechDetected = false;
+            recordedAudioChunks = [];
+            startSpeechListening();
+          }
+        }, 350);
+      }
+    }
+
+    // Immediate Automatic Execution of Spoken Command (Zero Button Clicks)
+    function triggerImmediateVoiceExecution() {
+      if (isExecutingVoice || isJarvisSpeaking) return;
+      let textToRun = speechSessionText.trim() || document.getElementById('cmdInput').value.trim();
+      if (!textToRun) return;
+
+      if (handsFreeActive) {
+        const lowerText = textToRun.toLowerCase();
+        if (!lowerText.includes('jarvis')) {
+          // Wake word not detected in continuous mode, ignore and reset
+          console.log('[Wake Word] Ignored background speech:', textToRun);
+          speechSessionText = '';
+          userSpokeInThisSession = false;
+          acousticSpeechDetected = false;
+          document.getElementById('cmdInput').value = '';
+          return; // Stay listening
+        }
+        // Remove the wake word so it doesn't clutter the command
+        textToRun = textToRun.replace(/hey jarvis,?/i, '').replace(/jarvis,?/i, '').trim();
+        if (!textToRun) textToRun = "Hello"; // if they just said "Jarvis", say hello
+      }
+
+      isExecutingVoice = true;
+      clearTimeout(voiceSilenceTimer);
+      acousticSpeechDetected = false;
+      userSpokeInThisSession = false;
+
+      // Disarm mic & stop recorder
+      stopSpeechListening(false);
+
+      // Visual HUD feedback
+      const badge = document.getElementById('autoExecBadge');
+      if (badge) badge.style.display = 'inline-block';
+      const statusText = document.getElementById('voiceStatusText');
+      if (statusText) statusText.textContent = '⚡ EXECUTING INSTRUCTION...';
+      setReactorState('processing', 'EXECUTING INSTRUCTION...');
+
+      setTimeout(() => {
+        hideVoiceStatusBar();
+        if (badge) badge.style.display = 'none';
+        document.getElementById('cmdInput').value = textToRun;
+        speechSessionText = '';
+        recordedAudioChunks = [];
+        submitUserCommand();
+        setTimeout(() => { isExecutingVoice = false; }, 400);
+      }, 60);
+    }
+
+    // Neural Voice Transcription Bridge (Transcribes directly via Gemini 3.5 Neural Core)
+    async function triggerNeuralAudioTranscription() {
+      if (isNeuralTranscribing || isExecutingVoice || isJarvisSpeaking) return;
+      isNeuralTranscribing = true;
+      acousticSpeechDetected = false;
+      userSpokeInThisSession = false;
+
+      if (recognition) {
+        try { recognition.stop(); } catch {}
+      }
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('recording');
+
+      setReactorState('processing', 'TRANSCRIBING NEURAL AUDIO MATRIX...');
+      const statusText = document.getElementById('voiceStatusText');
+      if (statusText) statusText.textContent = '⚡ TRANSCRIBING AUDIO VIA GEMINI ENGINE...';
+      const preview = document.getElementById('voiceTranscriptPreview');
+      if (preview) {
+        preview.textContent = 'Transcribing your spoken instruction...';
+        preview.classList.remove('empty');
+      }
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        try {
+          mediaRecorder.requestData();
+          mediaRecorder.stop();
+        } catch (e) {
+          console.warn('MediaRecorder stop warning:', e);
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 120));
+
+      if (!recordedAudioChunks || recordedAudioChunks.length === 0) {
+        console.log('[JARVIS Voice] No audio chunks recorded to transcribe.');
+        isNeuralTranscribing = false;
+        resumeListeningIfHandsFree();
+        return;
+      }
+
+      const audioBlob = new Blob(recordedAudioChunks, { type: recorderMimeType });
+      recordedAudioChunks = [];
+
+      if (audioBlob.size < 2500) {
+        console.log('[JARVIS Voice] Discarded minimal audio spike (' + audioBlob.size + ' bytes)');
+        isNeuralTranscribing = false;
+        resumeListeningIfHandsFree();
+        return;
+      }
+
+      try {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const res = reader.result;
+            const b64 = (typeof res === 'string') ? res.split(',')[1] : '';
+            resolve(b64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(audioBlob);
+        });
+
+        if (!base64Data) {
+          isNeuralTranscribing = false;
+          resumeListeningIfHandsFree();
+          return;
+        }
+
+        const key = document.getElementById('apiKeyInput')?.value.trim() || '';
+        const res = await fetch('/api/voice/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioBase64: base64Data,
+            mimeType: recorderMimeType,
+            apiKey: key
+          })
+        });
+
+        const data = await res.json();
+        const transcribedText = (data.text || '').trim();
+
+        if (transcribedText) {
+          console.log('[JARVIS Neural Voice Transcribed]:', transcribedText);
+          document.getElementById('cmdInput').value = transcribedText;
+          speechSessionText = transcribedText;
+          showVoiceStatusBar(transcribedText);
+          isNeuralTranscribing = false;
+
+          // ZERO BUTTON CLICKS: AUTO-EXECUTE IMMEDIATELY!
+          triggerImmediateVoiceExecution();
+        } else {
+          console.log('[JARVIS Voice] Gemini detected no human speech in audio chunk.');
+          isNeuralTranscribing = false;
+          resumeListeningIfHandsFree();
+        }
+      } catch (err) {
+        console.error('[JARVIS Neural Voice Error]:', err);
+        isNeuralTranscribing = false;
+        resumeListeningIfHandsFree();
+      }
+    }
+
+    function resumeListeningIfHandsFree() {
+      if (handsFreeActive && !isJarvisSpeaking && !isExecutingVoice) {
+        setTimeout(() => {
+          if (handsFreeActive && !isListening && !isJarvisSpeaking && !isExecutingVoice) {
+            setReactorState('listening', 'MICROPHONE ACTIVE · LISTENING FOR INSTRUCTIONS...');
+            startSpeechListening();
+          }
+        }, 300);
+      } else if (!isJarvisSpeaking && !isExecutingVoice) {
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        hideVoiceStatusBar();
+      }
+    }
+
+    function cancelVoiceRecognition() {
+      isStoppingRequested = true;
+      isExecutingVoice = false;
+      userSpokeInThisSession = false;
+      acousticSpeechDetected = false;
+      isNeuralTranscribing = false;
+      clearTimeout(voiceSilenceTimer);
+      speechSessionText = '';
+      document.getElementById('cmdInput').value = '';
+      stopSpeechListening(true);
+      setReactorState('idle', 'SYSTEM READY · STANDING BY');
+      playBeep(400, 0.1);
+    }
+
+    async function togglePushToTalk() {
+      if (isListening) {
+        if (speechSessionText.trim() || document.getElementById('cmdInput').value.trim()) {
+          triggerImmediateVoiceExecution();
+        } else if (acousticSpeechDetected) {
+          triggerNeuralAudioTranscription();
+        } else {
+          stopSpeechListening(true);
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        }
+      } else {
+        speechSessionText = '';
+        userSpokeInThisSession = false;
+        acousticSpeechDetected = false;
+        isExecutingVoice = false;
+        isNeuralTranscribing = false;
+        document.getElementById('cmdInput').value = '';
+        await startSpeechListening();
+      }
+    }
+
+    async function toggleHandsFreeListening() {
+      handsFreeActive = !handsFreeActive;
+      const btn = document.getElementById('handsFreeBtn');
+      const label = document.getElementById('handsFreeLabel');
+      
+      if (handsFreeActive) {
+        const ok = await ensureMicrophoneAccess();
+        if (!ok) {
+          handsFreeActive = false;
+          return;
+        }
+        btn.classList.add('green-active');
+        label.textContent = 'HANDS-FREE: ON';
+        speechSessionText = '';
+        userSpokeInThisSession = false;
+        acousticSpeechDetected = false;
+        isExecutingVoice = false;
+        isNeuralTranscribing = false;
+        document.getElementById('cmdInput').value = '';
+        await startSpeechListening();
+        playBeep(1400, 0.15);
+      } else {
+        btn.classList.remove('green-active');
+        label.textContent = 'HANDS-FREE: OFF';
+        stopSpeechListening(true);
+        playBeep(600, 0.1);
+      }
+    }
+
+    function showVoiceStatusBar(transcript) {
+      const bar = document.getElementById('voiceStatusBar');
+      const preview = document.getElementById('voiceTranscriptPreview');
+      const statusText = document.getElementById('voiceStatusText');
+      if (!bar) return;
+
+      bar.classList.add('active');
+      if (transcript && transcript.trim()) {
+        preview.textContent = `“${transcript.trim()}”`;
+        preview.classList.remove('empty');
+        if (statusText) statusText.textContent = 'LISTENING · AUTO-EXECUTING IMMEDIATELY ON PAUSE...';
+      } else {
+        preview.textContent = 'Speak your instruction (e.g. "Open Chrome", "Solve my homework", "Play music")...';
+        preview.classList.add('empty');
+        if (statusText) statusText.textContent = 'LISTENING FOR INSTRUCTION...';
+      }
+    }
+
+    function hideVoiceStatusBar() {
+      const bar = document.getElementById('voiceStatusBar');
+      if (bar) bar.classList.remove('active');
+    }
+
+    // Audio Waveform Visualizer in Arc Reactor & Acoustic VAD
+    function initAudioWaveVisualizerWithStream(stream) {
+      if (audioAnalyser) return;
+      try {
+        const ctx = getAudioContext();
+        const source = ctx.createMediaStreamSource(stream);
+        audioAnalyser = ctx.createAnalyser();
+        audioAnalyser.fftSize = 64;
+        source.connect(audioAnalyser);
+        audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+        renderAudioWave();
+      } catch (err) {
+        console.warn('Microphone waveform initialization notice:', err);
+      }
+    }
+
+    function renderAudioWave() {
+      const canvas = document.getElementById('audioWaveCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+
+      function draw() {
+        requestAnimationFrame(draw);
+        if (!audioAnalyser || (!isListening && !isJarvisSpeaking && !isNeuralTranscribing)) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          return;
+        }
+        audioAnalyser.getByteFrequencyData(audioDataArray);
+
+        // Acoustic Voice Activity Detection (VAD)
+        let sum = 0;
+        const bars = audioDataArray.length;
+        for (let i = 0; i < bars; i++) {
+          sum += audioDataArray[i];
+        }
+        const avgVol = sum / (bars * 255);
+
+        // Voice Detection: if user audio amplitude > speech threshold
+        if (avgVol > 0.05 && isListening && !isJarvisSpeaking && !isExecutingVoice && !isNeuralTranscribing) {
+          lastVoiceDetectedTime = Date.now();
+          if (!acousticSpeechDetected) {
+            acousticSpeechDetected = true;
+            userSpokeInThisSession = true;
+            showVoiceStatusBar(speechSessionText || '🎙️ HEARING YOUR INSTRUCTION... (Speak freely)');
+          }
+        }
+
+        // Rolling Pre-Roll Buffer: if user hasn't spoken yet, keep last ~600ms of audio, discard stale noise
+        if (isListening && !acousticSpeechDetected && recordedAudioChunks.length > 25) {
+          recordedAudioChunks.splice(0, recordedAudioChunks.length - 8);
+        }
+
+        // Acoustic Silence Detection:
+        // When user has spoken and has now paused for 1200ms:
+        if (isListening && acousticSpeechDetected && !isExecutingVoice && !isJarvisSpeaking && !isNeuralTranscribing) {
+          const silenceDuration = Date.now() - lastVoiceDetectedTime;
+          if (silenceDuration > 1200) {
+            if (speechSessionText.trim().length > 1) {
+              triggerImmediateVoiceExecution();
+            } else if (!handsFreeActive) {
+              triggerNeuralAudioTranscription();
+            } else {
+              // In hands free mode, if Web Speech API didn't pick up text, ignore background noise
+              acousticSpeechDetected = false;
+              userSpokeInThisSession = false;
+              lastVoiceDetectedTime = Date.now();
+            }
+          }
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const radius = 95;
+
+        ctx.strokeStyle = isJarvisSpeaking ? '#ffd000' : (acousticSpeechDetected ? '#00ff88' : '#00f0ff');
+        ctx.lineWidth = 2;
+
+        for (let i = 0; i < bars; i++) {
+          const rad = (Math.PI * 2 / bars) * i;
+          const val = audioDataArray[i] / 255;
+          const barLen = val * (acousticSpeechDetected ? 48 : 36);
+          const x1 = cx + Math.cos(rad) * radius;
+          const y1 = cy + Math.sin(rad) * radius;
+          const x2 = cx + Math.cos(rad) * (radius + barLen);
+          const y2 = cy + Math.sin(rad) * (radius + barLen);
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+      }
+      draw();
+    }
+
+    // ==========================================
+    // IRON MAN HOLOGRAPHIC HAND GESTURE TRACKING
+    // ==========================================
+    let gestureHudActive = false;
+    let cameraInstance = null;
+    let handsDetector = null;
+    let lastRepulsorTime = 0;
+
+    async function toggleGestureHud() {
+      gestureHudActive = !gestureHudActive;
+      const windowEl = document.getElementById('gestureHudWindow');
+      const btn = document.getElementById('gestureHudBtn');
+      const label = document.getElementById('gestureLabel');
+
+      if (gestureHudActive) {
+        windowEl.classList.add('active');
+        btn.classList.add('active');
+        label.textContent = 'GESTURE HUD: ON';
+        playBeep(1200, 0.15);
+        await initHandTracking();
+      } else {
+        windowEl.classList.remove('active');
+        btn.classList.remove('active');
+        label.textContent = 'GESTURE HUD: OFF';
+        playBeep(500, 0.1);
+        if (cameraInstance) {
+          try { cameraInstance.stop(); } catch {}
+        }
+      }
+    }
+
+    async function initHandTracking() {
+      const video = document.getElementById('webcamVideo');
+      const canvas = document.getElementById('gestureCanvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!handsDetector) {
+        handsDetector = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        handsDetector.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.55
+        });
+
+        handsDetector.onResults((results) => {
+          renderHandHologram(ctx, canvas, results);
+        });
+      }
+
+      if (!cameraInstance && typeof Camera !== 'undefined') {
+        cameraInstance = new Camera(video, {
+          onFrame: async () => {
+            if (gestureHudActive) {
+              await handsDetector.send({ image: video });
+            }
+          },
+          width: 320,
+          height: 240
+        });
+        cameraInstance.start();
+      }
+    }
+
+    // Render Iron Man Holographic Hand Skeleton & Gestures
+    function renderHandHologram(ctx, canvas, results) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Holographic grid scan background
+      ctx.fillStyle = 'rgba(2, 10, 20, 0.65)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        document.getElementById('gestureName').textContent = 'GESTURE: SCANNING...';
+        document.getElementById('gesturePinch').textContent = 'REPULSOR: READY';
+        return;
+      }
+
+      const CONNECTIONS = [
+        [0,1],[1,2],[2,3],[3,4],
+        [0,5],[5,6],[6,7],[7,8],
+        [5,9],[9,10],[10,11],[11,12],
+        [9,13],[13,14],[14,15],[15,16],
+        [13,17],[17,18],[18,19],[19,20],
+        [0,17]
+      ];
+
+      for (const landmarks of results.multiHandLandmarks) {
+        // Draw Skeleton Connections
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 8;
+
+        for (const [i, j] of CONNECTIONS) {
+          const p1 = landmarks[i];
+          const p2 = landmarks[j];
+          ctx.beginPath();
+          ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+          ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+          ctx.stroke();
+        }
+
+        // Draw Knuckle Joint Nodes
+        for (let i = 0; i < landmarks.length; i++) {
+          const pt = landmarks[i];
+          const x = pt.x * canvas.width;
+          const y = pt.y * canvas.height;
+
+          ctx.fillStyle = i === 4 || i === 8 || i === 12 || i === 16 || i === 20 ? '#00ff88' : '#00f0ff';
+          ctx.beginPath();
+          ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // PALM REPULSOR CORE (Tony Stark palm blast)
+        const palmCenter = landmarks[9]; // middle MCP
+        const wrist = landmarks[0];
+        const px = palmCenter.x * canvas.width;
+        const py = palmCenter.y * canvas.height;
+
+        // Distance between thumb (4) and index (8) for pinch
+        const thumbTip = landmarks[4];
+        const indexTip = landmarks[8];
+        const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+
+        // Check Open Palm (Repulsor Pose)
+        const indexY = landmarks[8].y;
+        const middleY = landmarks[12].y;
+        const ringY = landmarks[16].y;
+        const pinkyY = landmarks[20].y;
+        const isOpenPalm = indexY < landmarks[6].y && middleY < landmarks[10].y && ringY < landmarks[14].y && pinkyY < landmarks[18].y;
+
+        // Draw Palm Repulsor Glow
+        ctx.shadowBlur = isOpenPalm ? 25 : 12;
+        ctx.shadowColor = isOpenPalm ? '#ffffff' : '#00f0ff';
+        ctx.fillStyle = isOpenPalm ? '#ffffff' : 'rgba(0, 240, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(px, py, isOpenPalm ? 9 : 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Gesture Detection State
+        if (isOpenPalm) {
+          document.getElementById('gestureName').textContent = 'GESTURE: REPULSOR BLAST 🖐️';
+          document.getElementById('gesturePinch').textContent = 'CHARGE: 100%';
+          setReactorState('repulsor-blast', 'REPULSOR HARNESS ENGAGED');
+
+          const now = Date.now();
+          if (now - lastRepulsorTime > 1600) {
+            playRepulsorSound();
+            lastRepulsorTime = now;
+          }
+        } else if (pinchDist < 0.08) {
+          document.getElementById('gestureName').textContent = 'GESTURE: HOLOGRAPHIC PINCH 🤏';
+          document.getElementById('gesturePinch').textContent = `DELTA: ${(pinchDist * 100).toFixed(0)}%`;
+          
+          // Pinch manipulation on Arc Reactor
+          const scaleVal = Math.max(0.75, Math.min(1.4, 1.2 - pinchDist * 4));
+          const arcEl = document.getElementById('arcReactor');
+          if (arcEl) {
+            arcEl.style.transform = `scale(${scaleVal}) rotate(${(indexTip.x - 0.5) * 60}deg)`;
+          }
+        } else {
+          document.getElementById('gestureName').textContent = 'GESTURE: TRACKING HAND';
+          document.getElementById('gesturePinch').textContent = 'REPULSOR: CHARGING';
+          const arcEl = document.getElementById('arcReactor');
+          if (arcEl && !arcEl.classList.contains('repulsor-blast')) {
+            arcEl.style.transform = 'scale(1) rotate(0deg)';
+          }
+        }
+      }
+    }
+
+    // ==========================================
+    // REACTOR STATE MANAGER
+    // ==========================================
+    function setReactorState(state, text) {
+      const reactor = document.getElementById('arcReactor');
+      const status = document.getElementById('reactorStatusText');
+      reactor.className = 'reactor ' + state;
+      status.textContent = text.toUpperCase();
+    }
+
+    // ==========================================
+    // MULTIMODAL FILE UPLOADS (MULTIPLE FILES & ANY SIZE SUPPORT)
+    // ==========================================
+    let currentAttachedFiles = [];
+    let isUploadingFile = false;
+
+    // Backward-compatibility accessor
+    Object.defineProperty(window, 'currentAttachedFile', {
+      get() { return currentAttachedFiles[0] || null; },
+      set(val) {
+        if (!val) currentAttachedFiles = [];
+        else currentAttachedFiles = [val];
+        renderFilePreviewPills();
+      },
+      configurable: true
+    });
+
+    function triggerFileInput() {
+      const input = document.getElementById('fileUploadInput');
+      if (input) input.click();
+    }
+
+    function handleFileSelection(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length > 0) {
+        uploadFilesToCore(files);
+      }
+      event.target.value = '';
+    }
+
+    function getFileIcon(f) {
+      if (f.isZip) return '🗜️';
+      if (f.isImage) return '🖼️';
+      if (f.isVideo) return '🎬';
+      if (f.isPdf || f.originalName?.toLowerCase().endsWith('.pdf')) return '📕';
+      return '📄';
+    }
+
+    function renderFilePreviewPills() {
+      const container = document.getElementById('filePillsContainer');
+      const previewStrip = document.getElementById('filePreviewStrip');
+      const attachBtn = document.getElementById('attachBtn');
+      const fridaySnapBtn = document.getElementById('fridaySnapBtn');
+      const clearAllBtn = document.getElementById('clearAllFilesBtn');
+
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (currentAttachedFiles.length === 0) {
+        if (previewStrip) previewStrip.classList.remove('active');
+        if (attachBtn) attachBtn.classList.remove('has-file');
+        if (fridaySnapBtn) fridaySnapBtn.classList.remove('has-file');
+        if (clearAllBtn) clearAllBtn.style.display = 'none';
+        return;
+      }
+
+      if (previewStrip) previewStrip.classList.add('active');
+      if (attachBtn) attachBtn.classList.add('has-file');
+      if (clearAllBtn) clearAllBtn.style.display = currentAttachedFiles.length > 1 ? 'inline-block' : 'none';
+
+      currentAttachedFiles.forEach((file, idx) => {
+        const pill = document.createElement('div');
+        pill.className = 'file-pill';
+        pill.style.maxWidth = '280px';
+        pill.style.display = 'inline-flex';
+        pill.style.alignItems = 'center';
+        pill.style.gap = '6px';
+        pill.innerHTML = `
+          <span>${getFileIcon(file)}</span>
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;" title="${file.originalName}">${file.originalName}</span>
+          <span class="file-pill-size">${file.formattedSize || ''}</span>
+          <button class="file-pill-remove" onclick="removeAttachedFile(${idx})" title="Remove file">✖</button>
+        `;
+        container.appendChild(pill);
+      });
+    }
+
+    function removeAttachedFile(index = null) {
+      if (typeof index === 'number' && index >= 0) {
+        currentAttachedFiles.splice(index, 1);
+      } else {
+        currentAttachedFiles = [];
+      }
+      isUploadingFile = false;
+      renderFilePreviewPills();
+      playBeep(450, 0.05);
+    }
+
+    function removeAllAttachedFiles() {
+      currentAttachedFiles = [];
+      isUploadingFile = false;
+      renderFilePreviewPills();
+      playBeep(450, 0.05);
+    }
+
+    function formatBytesClient(bytes, decimals = 1) {
+      if (!+bytes) return '0 B';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    function uploadFileToCore(file) {
+      if (file) uploadFilesToCore([file]);
+    }
+
+    function uploadFilesToCore(files) {
+      if (!files || files.length === 0) return;
+      isUploadingFile = true;
+
+      const previewStrip = document.getElementById('filePreviewStrip');
+      const progressWrap = document.getElementById('uploadProgressWrap');
+      const progressFill = document.getElementById('uploadProgressFill');
+      const statusText = document.getElementById('uploadStatusText');
+
+      previewStrip.classList.add('active');
+      progressWrap.style.display = 'block';
+      statusText.style.display = 'inline';
+      progressFill.style.width = '0%';
+
+      const fileCountText = files.length > 1 ? `${files.length} FILES` : files[0].name.toUpperCase();
+      statusText.textContent = `STREAMING 0%`;
+
+      setReactorState('processing', `STREAMING ${fileCountText} INTO CORE...`);
+      playBeep(1100, 0.08);
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('files', file);
+      }
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload', true);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          progressFill.style.width = percent + '%';
+          statusText.textContent = `INGESTION: ${percent}% (${formatBytesClient(e.loaded)} / ${formatBytesClient(e.total)})`;
+        }
+      };
+
+      xhr.onload = () => {
+        isUploadingFile = false;
+        progressWrap.style.display = 'none';
+        statusText.style.display = 'none';
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            const receivedFiles = Array.isArray(data.files) ? data.files : (data.file ? [data.file] : []);
+            if (data.success && receivedFiles.length > 0) {
+              currentAttachedFiles.push(...receivedFiles);
+              renderFilePreviewPills();
+
+              if (receivedFiles.length === 1) {
+                const single = receivedFiles[0];
+                if (single.isZip) setReactorState('idle', `ZIP ARCHIVE INGESTED (${single.entryCount} ENTRIES)`);
+                else if (single.isImage) setReactorState('idle', `IMAGE READY (${single.formattedSize})`);
+                else if (single.isVideo) setReactorState('idle', `VIDEO READY (${single.formattedSize})`);
+                else setReactorState('idle', `FILE INGESTED (${single.formattedSize})`);
+              } else {
+                setReactorState('idle', `${receivedFiles.length} FILES INGESTED INTO CORE`);
+              }
+
+              playBeep(1500, 0.12);
+              document.getElementById('cmdInput').focus();
+              return;
+            }
+          } catch (e) {}
+        }
+
+        alert('Error uploading files to JARVIS Core: ' + xhr.responseText);
+        renderFilePreviewPills();
+      };
+
+      xhr.onerror = () => {
+        isUploadingFile = false;
+        progressWrap.style.display = 'none';
+        statusText.style.display = 'none';
+        alert('Network anomaly during file upload.');
+        renderFilePreviewPills();
+      };
+
+      xhr.send(formData);
+    }
+
+    // ==========================================
+    // THE FRIDAY PROTOCOL: OPTICAL SCREEN VISION & OCR
+    // ==========================================
+    let fridayVisionActive = false;
+    let fridayStream = null;
+
+    function toggleFridayVisionHud() {
+      fridayVisionActive = !fridayVisionActive;
+      const windowEl = document.getElementById('fridayVisionHudWindow');
+      const btn = document.getElementById('fridayVisionBtn');
+      const label = document.getElementById('fridayVisionLabel');
+
+      if (fridayVisionActive) {
+        windowEl.classList.add('active');
+        if (btn) btn.classList.add('active');
+        if (label) label.textContent = 'FRIDAY: ON';
+        playBeep(1300, 0.12);
+      } else {
+        windowEl.classList.remove('active');
+        if (btn) btn.classList.remove('active');
+        if (label) label.textContent = 'FRIDAY VISION';
+        playBeep(500, 0.1);
+        if (fridayStream) {
+          try { fridayStream.getTracks().forEach(t => t.stop()); } catch {}
+          fridayStream = null;
+        }
+        const placeholder = document.getElementById('fridayPlaceholder');
+        if (placeholder) placeholder.style.display = 'block';
+      }
+    }
+
+    async function toggleScreenShareStream() {
+      const video = document.getElementById('fridayScreenVideo');
+      const canvas = document.getElementById('fridayCanvas');
+      const placeholder = document.getElementById('fridayPlaceholder');
+      const btn = document.getElementById('streamScreenBtn');
+
+      if (fridayStream) {
+        fridayStream.getTracks().forEach(t => t.stop());
+        fridayStream = null;
+        btn.textContent = '🖥️ SHARE TAB / DISPLAY';
+        btn.classList.remove('green-active');
+        if (placeholder) placeholder.style.display = 'block';
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'monitor', frameRate: 15 }
+        });
+        fridayStream = stream;
+        video.srcObject = stream;
+        video.play();
+        if (placeholder) placeholder.style.display = 'none';
+        btn.textContent = '⏹️ STOP STREAM';
+        btn.classList.add('green-active');
+        playBeep(1400, 0.1);
+
+        stream.getVideoTracks()[0].onended = () => {
+          fridayStream = null;
+          btn.textContent = '🖥️ SHARE TAB / DISPLAY';
+          btn.classList.remove('green-active');
+          if (placeholder) placeholder.style.display = 'block';
+        };
+
+        const ctx = canvas.getContext('2d');
+        function drawFridayFeed() {
+          if (!fridayStream) return;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          // Tactical HUD overlay on screen canvas
+          ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(10, 10); ctx.lineTo(30, 10);
+          ctx.moveTo(10, 10); ctx.lineTo(10, 30);
+          ctx.moveTo(canvas.width - 10, 10); ctx.lineTo(canvas.width - 30, 10);
+          ctx.moveTo(canvas.width - 10, 10); ctx.lineTo(canvas.width - 10, 30);
+          ctx.stroke();
+
+          // Horizontal scan bar
+          const scanY = (Date.now() / 15) % canvas.height;
+          ctx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+          ctx.beginPath();
+          ctx.moveTo(0, scanY);
+          ctx.lineTo(canvas.width, scanY);
+          ctx.stroke();
+
+          requestAnimationFrame(drawFridayFeed);
+        }
+        drawFridayFeed();
+      } catch (err) {
+        console.warn('Display Media canceled or not supported:', err);
+      }
+    }
+
+    async function captureAndAnalyzeVision(promptText = null) {
+      if (fridayStream) {
+        const canvas = document.createElement('canvas');
+        const video = document.getElementById('fridayScreenVideo');
+        canvas.width = video.videoWidth || 1920;
+        canvas.height = video.videoHeight || 1080;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const file = new File([blob], `Stream_Capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            uploadFileToCore(file);
+            if (promptText) {
+              document.getElementById('cmdInput').value = promptText;
+              setTimeout(submitUserCommand, 400);
+            }
+          }
+        }, 'image/jpeg', 0.92);
+      } else {
+        await triggerFridaySnap(promptText);
+      }
+    }
+
+    async function triggerFridaySnap(customPrompt = null) {
+      setReactorState('processing', 'FRIDAY PROTOCOL · ACQUIRING DESKTOP SCREEN SNAPSHOT...');
+      playBeep(1200, 0.1);
+
+      try {
+        const res = await fetch('/api/screen/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: customPrompt || 'Active Screen Vision OCR' })
+        });
+        const data = await res.json();
+
+        if (data.success && data.file) {
+          currentAttachedFiles.push(data.file);
+          renderFilePreviewPills();
+
+          const fridaySnapBtn = document.getElementById('fridaySnapBtn');
+          if (fridaySnapBtn) fridaySnapBtn.classList.add('has-file');
+
+          setReactorState('idle', 'FRIDAY PROTOCOL · SCREEN VISION CAPTURED');
+          playBeep(1600, 0.12);
+
+          const input = document.getElementById('cmdInput');
+          if (customPrompt) {
+            input.value = customPrompt;
+            submitUserCommand();
+          } else {
+            input.placeholder = "Screen captured! Ask: 'Read unread messages', 'Solve homework', 'Summarize emails'...";
+            input.focus();
+          }
+        } else {
+          alert('Failed to capture desktop screen: ' + (data.error || 'Unknown error'));
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        }
+      } catch (err) {
+        alert('Network error during screen capture: ' + err.message);
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+      }
+    }
+
+    // ==========================================
+    // AUTONOMOUS BROWSER AUTOMATION & LAB PILOT CONTROLLER
+    // ==========================================
+    let browserMatrixActive = false;
+    let cachedDetectedCredentials = null;
+
+    function toggleBrowserMatrixHud() {
+      browserMatrixActive = !browserMatrixActive;
+      const windowEl = document.getElementById('browserMatrixHudWindow');
+      const btn = document.getElementById('browserMatrixBtn');
+      const label = document.getElementById('browserMatrixLabel');
+
+      if (browserMatrixActive) {
+        windowEl.style.display = 'flex';
+        if (btn) btn.classList.add('active');
+        if (label) label.textContent = 'BROWSER: ON';
+        playBeep(1400, 0.12);
+        refreshBrowserStatus();
+      } else {
+        windowEl.style.display = 'none';
+        if (btn) btn.classList.remove('active');
+        if (label) label.textContent = 'BROWSER PILOT';
+        playBeep(500, 0.1);
+      }
+    }
+
+    async function refreshBrowserStatus() {
+      try {
+        const res = await fetch('/api/browser/status');
+        const status = await res.json();
+        
+        const badge = document.getElementById('browserPilotStateBadge');
+        const titleEl = document.getElementById('browserPageTitle');
+        const incogBadge = document.getElementById('browserIncognitoBadge');
+        
+        if (status.active) {
+          if (badge) {
+            badge.textContent = 'ACTIVE · ONLINE';
+            badge.style.borderColor = 'var(--green)';
+            badge.style.color = 'var(--green)';
+          }
+          if (titleEl) titleEl.textContent = status.title || status.url;
+          if (incogBadge) incogBadge.textContent = status.incognito ? '[INCOGNITO]' : '[STANDARD]';
+        } else {
+          if (badge) {
+            badge.textContent = 'STANDBY';
+            badge.style.borderColor = 'var(--border)';
+            badge.style.color = 'var(--text-dim)';
+          }
+          if (titleEl) titleEl.textContent = 'Browser idle';
+        }
+      } catch (err) {
+        console.warn('Browser status fetch error:', err);
+      }
+    }
+
+    async function executeBrowserNavigate() {
+      const input = document.getElementById('browserUrlInput');
+      const url = input.value.trim();
+      if (!url) return;
+
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--cyan);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Launching managed Chrome and parsing DOM...</div>`;
+      setReactorState('processing', 'NAVIGATING BROWSER TO ' + url.slice(0, 30));
+
+      try {
+        const res = await fetch('/api/browser/navigate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, incognito: false, headless: false })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('browserPageTitle').textContent = data.title;
+          renderInteractiveDomElements(data.intel, data.credentials);
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+          playBeep(1200, 0.1);
+          refreshBrowserStatus();
+        } else {
+          domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Error: ${data.error}</div>`;
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Navigation failed: ${err.message}</div>`;
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+      }
+    }
+
+    async function executeBrowserExtractDom() {
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--cyan);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Extracting DOM interactive tree...</div>`;
+
+      try {
+        const res = await fetch('/api/browser/dom', { method: 'POST' });
+        const data = await res.json();
+        if (data.textSummary) {
+          renderInteractiveDomElements(data.textSummary, data.credentials);
+          playBeep(1000, 0.08);
+          refreshBrowserStatus();
+        } else {
+          domContent.innerHTML = `<div style="color:var(--red); padding:10px;">DOM Extraction failed. Make sure a browser is open.</div>`;
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function renderInteractiveDomElements(textSummary, credentials) {
+      const domContent = document.getElementById('browserDomContent');
+      const credBox = document.getElementById('browserCredentialsBox');
+      const credDetails = document.getElementById('browserCredentialsDetails');
+
+      if (credentials && (credentials.username || credentials.password || credentials.projectId)) {
+        cachedDetectedCredentials = credentials;
+        let detailsHtml = '';
+        if (credentials.username) detailsHtml += `<div><b>Student:</b> ${credentials.username}</div>`;
+        if (credentials.password) detailsHtml += `<div><b>Password:</b> ${credentials.password}</div>`;
+        if (credentials.projectId) detailsHtml += `<div><b>GCP Project:</b> ${credentials.projectId}</div>`;
+        if (credentials.timerRemaining) detailsHtml += `<div><b>Timer:</b> ${credentials.timerRemaining}</div>`;
+        credDetails.innerHTML = detailsHtml;
+        credBox.style.display = 'block';
+      } else {
+        credBox.style.display = 'none';
+        cachedDetectedCredentials = null;
+      }
+
+      if (!textSummary) {
+        domContent.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding-top:40px;">No interactive elements returned.</div>';
+        return;
+      }
+
+      const lines = textSummary.split('\n');
+      let html = `<div style="color:var(--cyan); font-weight:bold; margin-bottom:8px;">INTERACTIVE DOM MATRIX</div>`;
+
+      for (const line of lines) {
+        const match = line.match(/^\[#(\d+)\]\s+([A-Z]+(?:\[\w+\])?)\s+"([^"]*)"\s+\|\s+selector:\s+"([^"]*)"/);
+        if (match) {
+          const idx = match[1];
+          const tag = match[2];
+          const text = match[3] || '(unlabeled)';
+          const sel = match[4];
+          const isInput = tag.includes('INPUT') || tag.includes('TEXTAREA');
+
+          html += `
+            <div style="background:rgba(0,240,255,0.04); border:1px solid rgba(0,240,255,0.12); border-radius:4px; padding:6px 8px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+              <div style="overflow:hidden; text-overflow:ellipsis;">
+                <span style="color:var(--gold); font-weight:bold;">#${idx}</span> 
+                <span style="color:var(--cyan); font-size:0.65rem;">[${tag}]</span> 
+                <span style="color:#fff;">"${text}"</span>
+                <div style="color:var(--text-dim); font-size:0.6rem; overflow:hidden; text-overflow:ellipsis;">${sel}</div>
+              </div>
+              <div style="display:flex; gap:4px;">
+                <button class="hud-btn" onclick="executeBrowserClick('${idx}')" style="padding:2px 6px; font-size:0.58rem;">
+                  CLICK
+                </button>
+                ${isInput ? `
+                  <button class="hud-btn" onclick="promptBrowserType('${idx}')" style="padding:2px 6px; font-size:0.58rem; background:rgba(0,240,255,0.2);">
+                    TYPE
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        } else if (line.startsWith('===') || line.startsWith('[PAGE')) {
+          html += `<div style="color:var(--gold); font-size:0.68rem; margin:6px 0 2px 0;">${line}</div>`;
+        }
+      }
+
+      domContent.innerHTML = html;
+    }
+
+    async function executeBrowserClick(indexOrSelector) {
+      playBeep(1100, 0.08);
+      try {
+        const res = await fetch('/api/browser/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: parseInt(indexOrSelector, 10), waitForNav: true })
+        });
+        const data = await res.json();
+        if (data.intel) {
+          renderInteractiveDomElements(data.intel);
+          refreshBrowserStatus();
+        }
+      } catch (err) {
+        console.error('Browser click error:', err);
+      }
+    }
+
+    async function promptBrowserType(index) {
+      const text = prompt('Enter text to type into element #' + index + ':');
+      if (text === null) return;
+      playBeep(1200, 0.08);
+      try {
+        const res = await fetch('/api/browser/type', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: parseInt(index, 10), text, clear: true, pressEnter: false })
+        });
+        const data = await res.json();
+        if (data.intel) {
+          renderInteractiveDomElements(data.intel);
+        }
+      } catch (err) {
+        console.error('Browser type error:', err);
+      }
+    }
+
+    async function executeBrowserScreenshot() {
+      const drawer = document.getElementById('browserScreenshotDrawer');
+      const img = document.getElementById('browserScreenshotImg');
+      try {
+        const res = await fetch('/api/browser/screenshot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+        if (data.base64) {
+          img.src = 'data:image/jpeg;base64,' + data.base64;
+          drawer.style.display = 'block';
+          playBeep(1300, 0.1);
+        }
+      } catch (err) {
+        console.error('Screenshot error:', err);
+      }
+    }
+
+    async function injectDetectedCredentials() {
+      if (!cachedDetectedCredentials || !cachedDetectedCredentials.username || !cachedDetectedCredentials.password) {
+        alert('No credentials cached from page.');
+        return;
+      }
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--gold);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Injecting credentials into Incognito Google Cloud Console...</div>`;
+
+      try {
+        const res = await fetch('/api/browser/inject-credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: 'https://console.cloud.google.com',
+            username: cachedDetectedCredentials.username,
+            password: cachedDetectedCredentials.password,
+            projectId: cachedDetectedCredentials.projectId,
+            incognito: true,
+            headless: false
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderInteractiveDomElements(data.intel);
+          if (data.screenshotBase64) {
+            document.getElementById('browserScreenshotImg').src = 'data:image/jpeg;base64,' + data.screenshotBase64;
+            document.getElementById('browserScreenshotDrawer').style.display = 'block';
+          }
+          speakJarvis('Credentials successfully injected into Incognito Google Cloud Console, Sir.');
+          refreshBrowserStatus();
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Credential injection failed: ${err.message}</div>`;
+      }
+    }
+
+    async function executeBrowserSolveLab() {
+      const urlInput = document.getElementById('browserUrlInput');
+      const labUrl = urlInput.value.trim() || undefined;
+
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--gold);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Autonomous Lab Pilot engaged: starting lab and launching Incognito GCP console...</div>`;
+      setReactorState('processing', 'SOLVING GOOGLE CLOUD LAB AUTONOMOUSLY...');
+
+      try {
+        const res = await fetch('/api/browser/solve-lab', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ labUrl, autoStart: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderInteractiveDomElements(data.intel, data.credentials);
+          if (data.screenshotBase64) {
+            document.getElementById('browserScreenshotImg').src = 'data:image/jpeg;base64,' + data.screenshotBase64;
+            document.getElementById('browserScreenshotDrawer').style.display = 'block';
+          }
+          speakJarvis('Autonomous lab pilot executed, Sir. Credentials extracted and logged into Google Cloud Console.');
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+          refreshBrowserStatus();
+        } else {
+          domContent.innerHTML = `<div style="color:var(--red); padding:10px;">${data.message || data.error}</div>`;
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Lab solver error: ${err.message}</div>`;
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+      }
+    }
+
+    async function executeBrowserStartLab() {
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--cyan);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Piercing Shadow DOM and clicking Start Lab...</div>`;
+      setReactorState('processing', 'CLICKING START LAB BUTTON...');
+
+      try {
+        const res = await fetch('/api/browser/start-lab', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          domContent.innerHTML = `<div style="color:var(--green); padding:10px;">✓ Start Lab clicked successfully! ${data.modalHandled ? 'Confirmed modal prompt.' : ''}</div>`;
+          speakJarvis('Start lab button triggered successfully, Sir.');
+          setTimeout(executeBrowserExtractDom, 3000);
+        } else {
+          domContent.innerHTML = `<div style="color:var(--red); padding:10px;">${data.error || 'Failed to trigger start lab.'}</div>`;
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Error: ${err.message}</div>`;
+      } finally {
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        refreshBrowserStatus();
+      }
+    }
+
+    async function executeBrowserCheckProgress() {
+      const domContent = document.getElementById('browserDomContent');
+      domContent.innerHTML = `<div style="text-align:center; padding-top:40px; color:var(--green);"><span style="animation:spin 1s infinite; display:inline-block;">⚡</span> Auditing and verifying all progress checkpoints...</div>`;
+      setReactorState('processing', 'AUDITING LAB PROGRESS CHECKPOINTS...');
+
+      try {
+        const res = await fetch('/api/browser/check-progress', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          domContent.innerHTML = `<div style="color:var(--green); padding:10px;">✓ Clicked ${data.clickedCount} progress checkpoint buttons. Score: <strong>${data.score}</strong> (${data.checksPassed} completed).</div>`;
+          speakJarvis(`Progress audit complete, Sir. Assessment score is ${data.score}.`);
+        } else {
+          domContent.innerHTML = `<div style="color:var(--red); padding:10px;">${data.error || 'Could not audit progress.'}</div>`;
+        }
+      } catch (err) {
+        domContent.innerHTML = `<div style="color:var(--red); padding:10px;">Error: ${err.message}</div>`;
+      } finally {
+        setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        refreshBrowserStatus();
+      }
+    }
+
+    async function executeBrowserClose() {
+      try {
+        await fetch('/api/browser/close', { method: 'POST' });
+        document.getElementById('browserPageTitle').textContent = 'Browser closed';
+        document.getElementById('browserDomContent').innerHTML = '<div style="color:var(--text-dim); text-align:center; padding-top:40px;">Browser closed. Click "GO ➔" to launch a new session.</div>';
+        document.getElementById('browserScreenshotDrawer').style.display = 'none';
+        document.getElementById('browserCredentialsBox').style.display = 'none';
+        refreshBrowserStatus();
+        playBeep(400, 0.1);
+      } catch (err) {
+        console.error('Browser close error:', err);
+      }
+    }
+
+    // Drag and Drop Full Holographic HUD Listeners
+    let dragCounter = 0;
+    window.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      const overlay = document.getElementById('dragDropOverlay');
+      if (overlay) overlay.classList.add('active');
+    });
+
+    window.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        const overlay = document.getElementById('dragDropOverlay');
+        if (overlay) overlay.classList.remove('active');
+      }
+    });
+
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      const overlay = document.getElementById('dragDropOverlay');
+      if (overlay) overlay.classList.remove('active');
+
+      const files = Array.from(e.dataTransfer?.files || []);
+      if (files.length > 0) {
+        uploadFilesToCore(files);
+      }
+    });
+
+    // ==========================================
+    // COMMAND SUBMISSION & AUTO-TAB REDIRECTION
+    // ==========================================
+    async function submitUserCommand() {
+      const input = document.getElementById('cmdInput');
+      const text = input.value.trim();
+      const filesToSubmit = [...currentAttachedFiles];
+
+      if (!text && filesToSubmit.length === 0) return;
+
+      input.value = '';
+      playBeep(900, 0.05);
+
+      let userDisplayMsg = text;
+      if (!userDisplayMsg && filesToSubmit.length > 0) {
+        if (filesToSubmit.length === 1) {
+          userDisplayMsg = `Please inspect and analyze this attached file: ${filesToSubmit[0].originalName}`;
+        } else {
+          userDisplayMsg = `Please inspect and analyze these ${filesToSubmit.length} attached files: ${filesToSubmit.map(f => f.originalName).join(', ')}`;
+        }
+      }
+
+      appendMessage('user', userDisplayMsg, [], null, filesToSubmit);
+      setReactorState('processing', 'PROCESSING NEURAL INFERENCE & TOOLS...');
+
+      // Clear active attachments after queueing
+      removeAllAttachedFiles();
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            attachedFiles: filesToSubmit,
+            attachedFile: filesToSubmit[0] || null,
+            provider: activeAiProvider,
+            ollamaModel: activeOllamaModel
+          })
+        });
+        const data = await res.json();
+
+        // Add Jarvis reply with evolution event
+        appendMessage('jarvis', data.reply, data.actions, data.evolutionEvent);
+        speakJarvis(data.reply);
+        playBeep(1400, 0.1);
+
+        refreshStatus();
+      } catch (err) {
+        appendMessage('jarvis', 'Network anomaly detected: ' + err.message);
+        playBeep(300, 0.2);
+      } finally {
+        if (!handsFreeActive && !isJarvisSpeaking) {
+          setReactorState('idle', 'SYSTEM READY · STANDING BY');
+        }
+      }
+    }
+
+    function appendMessage(sender, text, actions = [], evolutionEvent = null, attachedFiles = null) {
+      const stream = document.getElementById('chatStream');
+      const msg = document.createElement('div');
+      msg.className = 'msg ' + sender;
+
+      const senderLabel = document.createElement('div');
+      senderLabel.className = 'msg-sender';
+      senderLabel.textContent = sender === 'user' ? 'USER' : 'J.A.R.V.I.S.';
+      msg.appendChild(senderLabel);
+
+      // Attached file chips rendering in user message
+      const fileList = Array.isArray(attachedFiles) ? attachedFiles : (attachedFiles ? [attachedFiles] : []);
+      if (fileList.length > 0) {
+        const fileWrap = document.createElement('div');
+        fileWrap.style.display = 'flex';
+        fileWrap.style.flexDirection = 'column';
+        fileWrap.style.gap = '6px';
+        fileWrap.style.marginBottom = '8px';
+
+        fileList.forEach(file => {
+          const fileChip = document.createElement('div');
+          fileChip.style.display = 'inline-flex';
+          fileChip.style.alignItems = 'center';
+          fileChip.style.gap = '8px';
+          fileChip.style.background = 'rgba(0, 0, 0, 0.4)';
+          fileChip.style.border = '1px solid var(--cyan)';
+          fileChip.style.padding = '6px 12px';
+          fileChip.style.borderRadius = '4px';
+          fileChip.style.fontFamily = 'var(--font-mono)';
+          fileChip.style.fontSize = '0.75rem';
+
+          const icon = file.isZip ? '🗜️' : (file.isImage ? '🖼️' : (file.isVideo ? '🎬' : (file.isPdf || file.originalName?.toLowerCase().endsWith('.pdf') ? '📕' : '📄')));
+          fileChip.innerHTML = `<span>${icon}</span> <strong>${file.originalName}</strong> <span style="color:var(--gold);">(${file.formattedSize || ''})</span>`;
+          fileWrap.appendChild(fileChip);
+
+          // Thumbnail preview for images
+          if (file.isImage && file.savedName) {
+            const imgPreview = document.createElement('img');
+            imgPreview.src = `/uploads/${file.savedName}`;
+            imgPreview.style.maxWidth = '100%';
+            imgPreview.style.maxHeight = '240px';
+            imgPreview.style.borderRadius = '4px';
+            imgPreview.style.border = '1px solid rgba(0, 240, 255, 0.3)';
+            imgPreview.style.display = 'block';
+            imgPreview.style.marginTop = '4px';
+            fileWrap.appendChild(imgPreview);
+          }
+        });
+
+        msg.appendChild(fileWrap);
+      }
+
+      const content = document.createElement('div');
+      content.textContent = text;
+      msg.appendChild(content);
+
+      if (actions && actions.length > 0) {
+        actions.forEach(act => {
+          const card = document.createElement('div');
+          card.className = 'action-card';
+          const badge = document.createElement('span');
+          badge.className = 'action-badge ' + (act.result?.success ? 'success' : '');
+          badge.textContent = `ACTION: ${act.tool.toUpperCase()}`;
+          card.appendChild(badge);
+
+          const detail = document.createElement('div');
+          if (act.result?.stdout) {
+            detail.textContent = act.result.stdout.slice(0, 300);
+          } else if (act.result?.message) {
+            detail.textContent = act.result.message;
+          } else if (act.result?.error) {
+            detail.textContent = 'Error: ' + act.result.error;
+            detail.style.color = 'var(--red)';
+          }
+          card.appendChild(detail);
+
+          // Direct Browser Tab Redirection
+          const targetUrl = act.result?.url || (act.args && act.args.url);
+          if (targetUrl) {
+            try {
+              window.open(targetUrl, '_blank', 'noopener,noreferrer');
+            } catch (e) {
+              console.warn('Popup blocked, rendering interactive button');
+            }
+
+            const openBtn = document.createElement('a');
+            openBtn.href = targetUrl;
+            openBtn.target = '_blank';
+            openBtn.rel = 'noopener noreferrer';
+            openBtn.className = 'hud-btn';
+            openBtn.style.marginTop = '8px';
+            openBtn.style.display = 'inline-flex';
+            openBtn.style.alignItems = 'center';
+            openBtn.style.gap = '6px';
+            openBtn.style.borderColor = 'var(--cyan)';
+            openBtn.style.color = '#fff';
+            openBtn.style.background = 'rgba(0, 240, 255, 0.25)';
+            openBtn.innerHTML = `<span>🚀</span> OPEN IN NEW TAB ↗`;
+            card.appendChild(openBtn);
+          }
+
+          // Desktop Application Foreground Focus Trigger
+          if (act.tool === 'open_application') {
+            const appBtn = document.createElement('button');
+            appBtn.className = 'hud-btn';
+            appBtn.style.marginTop = '8px';
+            appBtn.style.display = 'inline-flex';
+            appBtn.style.alignItems = 'center';
+            appBtn.style.gap = '6px';
+            appBtn.style.borderColor = 'var(--cyan)';
+            appBtn.style.color = '#fff';
+            appBtn.style.background = 'rgba(0, 240, 255, 0.25)';
+            appBtn.innerHTML = `<span>💻</span> BRING TO FOREGROUND`;
+            appBtn.onclick = () => {
+              if (act.result?.protocol) {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = act.result.protocol;
+                document.body.appendChild(iframe);
+                setTimeout(() => iframe.remove(), 2000);
+              }
+              fetch('/api/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ app_name: act.args?.app_name || 'code', protocol: act.result?.protocol })
+              }).catch(() => {});
+            };
+            card.appendChild(appBtn);
+          }
+
+          msg.appendChild(card);
+        });
+      }
+
+      // Continuous Autonomous Evolution Event
+      if (evolutionEvent) {
+        const evoCard = document.createElement('div');
+        evoCard.className = 'action-card';
+        evoCard.style.borderColor = 'var(--gold)';
+        evoCard.style.background = 'rgba(255, 208, 0, 0.08)';
+        evoCard.innerHTML = `<span class="action-badge" style="background:rgba(255,208,0,0.2);color:var(--gold);">⚡ CONTINUOUS SELF-EVOLUTION [${(evolutionEvent.key || 'ACTIVE').toUpperCase()}]</span><div style="color:var(--text);font-size:0.75rem;margin-top:2px;">${evolutionEvent.detail}</div>`;
+        msg.appendChild(evoCard);
+      }
+
+      stream.appendChild(msg);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function runQuick(text) {
+      document.getElementById('cmdInput').value = text;
+      submitUserCommand();
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        
+        // Sync Engine Status from /api/engine/status
+        try {
+          const engRes = await fetch('/api/engine/status');
+          const eng = await engRes.json();
+          activeAiProvider = eng.currentProvider || 'ollama';
+          activeOllamaModel = eng.currentOllamaModel || 'llama3.2:3b';
+          const engBtn = document.getElementById('engineSelectorBtn');
+          const engLabel = document.getElementById('engineLabel');
+          const engIcon = document.getElementById('engineIcon');
+
+          if (eng.currentProvider === 'ollama') {
+            if (engLabel) engLabel.textContent = `OLLAMA: ${eng.currentOllamaModel.split(':')[0].toUpperCase()}`;
+            if (engIcon) engIcon.textContent = '🦙';
+            if (engBtn) {
+              engBtn.classList.remove('gold');
+              engBtn.classList.add('green-active');
+            }
+          } else {
+            if (engLabel) engLabel.textContent = eng.hasGeminiKey ? 'GEMINI CLOUD ✓' : 'GEMINI (NO KEY)';
+            if (engIcon) engIcon.textContent = '⚡';
+            if (engBtn) {
+              engBtn.classList.remove('green-active');
+              if (!eng.hasGeminiKey) engBtn.classList.add('gold');
+              else engBtn.classList.remove('gold');
+            }
+          }
+        } catch {}
+
+        document.getElementById('prefCount').textContent = data.memoryStats.preferences;
+        document.getElementById('heuristicCount').textContent = data.memoryStats.heuristics;
+        document.getElementById('skillCount').textContent = data.memoryStats.customSkills;
+        document.getElementById('evolveCount').textContent = data.memoryStats.evolutionCycles + ' CYCLES';
+
+        const memRes = await fetch('/api/memory');
+        const mem = await memRes.json();
+        const list = document.getElementById('memoryList');
+        list.innerHTML = '';
+
+        Object.entries(mem.learned_preferences || {}).forEach(([k, v]) => {
+          const item = document.createElement('div');
+          item.className = 'matrix-item';
+          item.innerHTML = `<span class="matrix-badge">Preference: ${k}</span>${v.detail}`;
+          list.appendChild(item);
+        });
+
+        (mem.learned_heuristics || []).slice(-4).forEach(h => {
+          const item = document.createElement('div');
+          item.className = 'matrix-item';
+          item.innerHTML = `<span class="matrix-badge">${h.type}: ${h.key}</span>${h.detail}`;
+          list.appendChild(item);
+        });
+
+        if (list.children.length === 0) {
+          list.innerHTML = '<div class="matrix-item"><span class="matrix-badge">System Core</span>Continuous self-learning active. Ask JARVIS to remember something to train memory.</div>';
+        }
+      } catch {}
+    }
+
+    async function clearSession() {
+      if (confirm('Clear current session history?')) {
+        await fetch('/api/clear', { method: 'POST' });
+        document.getElementById('chatStream').innerHTML = `
+          <div class="msg jarvis">
+            <div class="msg-sender">J.A.R.V.I.S.</div>
+            Session cleared, Sir. Persistent memory and custom skills remain intact in the matrix. Ready for your next command.
+          </div>
+        `;
+      }
+    }
+
+    // AI Engine Configuration & Switching Matrix
+    let activeAiProvider = 'ollama';
+    let activeOllamaModel = 'llama3.2:3b';
+
+    function selectEngineOption(prov) {
+      activeAiProvider = prov;
+      const isGemini = prov === 'gemini';
+      const rGem = document.getElementById('radioGemini');
+      const rOll = document.getElementById('radioOllama');
+      if (rGem) rGem.checked = isGemini;
+      if (rOll) rOll.checked = !isGemini;
+
+      const cardGem = document.getElementById('cardGemini');
+      const cardOll = document.getElementById('cardOllama');
+
+      if (isGemini) {
+        if (cardGem) { cardGem.style.borderColor = 'var(--cyan)'; cardGem.style.background = 'rgba(0, 240, 255, 0.12)'; }
+        if (cardOll) { cardOll.style.borderColor = 'var(--border)'; cardOll.style.background = 'rgba(4, 12, 24, 0.6)'; }
+        const gSec = document.getElementById('geminiConfigSection');
+        const oSec = document.getElementById('ollamaConfigSection');
+        if (gSec) gSec.style.display = 'block';
+        if (oSec) oSec.style.display = 'none';
+      } else {
+        if (cardOll) { cardOll.style.borderColor = 'var(--cyan)'; cardOll.style.background = 'rgba(0, 240, 255, 0.12)'; }
+        if (cardGem) { cardGem.style.borderColor = 'var(--border)'; cardGem.style.background = 'rgba(4, 12, 24, 0.6)'; }
+        const gSec = document.getElementById('geminiConfigSection');
+        const oSec = document.getElementById('ollamaConfigSection');
+        if (gSec) gSec.style.display = 'none';
+        if (oSec) oSec.style.display = 'block';
+      }
+    }
+
+    function toggleKeyVisibility() {
+      const inp = document.getElementById('apiKeyInput');
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    async function openKeyModal() {
+      document.getElementById('keyModal').classList.add('open');
+      try {
+        const res = await fetch('/api/engine/status');
+        const data = await res.json();
+
+        activeAiProvider = data.currentProvider || 'gemini';
+        activeOllamaModel = data.currentOllamaModel || 'llama3.2:3b';
+        selectEngineOption(activeAiProvider);
+
+        if (data.geminiKeyPreview) {
+          document.getElementById('currentKeyPreview').textContent = `Current Key: ${data.geminiKeyPreview}`;
+        } else {
+          document.getElementById('currentKeyPreview').textContent = 'Current Key: None configured';
+        }
+
+        const pill = document.getElementById('ollamaStatusPill');
+        if (pill) {
+          if (data.ollamaOnline) {
+            pill.textContent = `🟢 OLLAMA CONNECTED (${(data.ollamaModels || []).length} MODELS)`;
+            pill.style.borderColor = 'var(--green)';
+            pill.style.color = 'var(--green)';
+            pill.style.background = 'rgba(0, 255, 136, 0.1)';
+          } else {
+            pill.textContent = '🔴 OLLAMA OFFLINE (PORT 11434)';
+            pill.style.borderColor = 'var(--red)';
+            pill.style.color = 'var(--red)';
+            pill.style.background = 'rgba(255, 51, 102, 0.1)';
+          }
+        }
+
+        const sel = document.getElementById('ollamaModelSelect');
+        if (sel && data.ollamaModels && data.ollamaModels.length > 0) {
+          sel.innerHTML = '';
+          data.ollamaModels.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            let desc = m;
+            if (m.includes('llama3.2')) desc += ' (Ultra Fast · Tool Calling & PC Automation · Recommended)';
+            else if (m.includes('qwen2.5-coder')) desc += ' (Deep Coding & Logical Reasoning)';
+            else if (m.includes('llava')) desc += ' (Multimodal Visual Vision Perception)';
+            opt.textContent = desc;
+            sel.appendChild(opt);
+          });
+          sel.value = activeOllamaModel;
+        }
+      } catch {}
+    }
+
+    function closeKeyModal() {
+      document.getElementById('keyModal').classList.remove('open');
+    }
+
+    async function saveEngineConfig() {
+      const newKey = document.getElementById('apiKeyInput').value.trim();
+      const sel = document.getElementById('ollamaModelSelect');
+      const selectedOllama = sel ? sel.value : activeOllamaModel;
+
+      const payload = {
+        provider: activeAiProvider,
+        ollamaModel: selectedOllama
+      };
+      if (newKey) {
+        payload.apiKey = newKey;
+      }
+
+      try {
+        const res = await fetch('/api/engine/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        closeKeyModal();
+        await refreshStatus();
+        appendMessage('jarvis', `System configuration updated, Sir. Active cognition engine switched to: ${data.provider === 'ollama' ? `Ollama (${data.ollamaModel}) [100% Offline]` : 'Google Gemini Cloud'}.`);
+        speakJarvis(`Cognition engine activated.`);
+      } catch (err) {
+        alert('Error saving engine configuration: ' + err.message);
+      }
+    }
+
+    async function testCurrentEngineConnection() {
+      try {
+        if (activeAiProvider === 'ollama') {
+          const res = await fetch('http://localhost:11434/api/tags');
+          if (res.ok) {
+            alert('SUCCESS: Local Ollama service is online and responding at http://localhost:11434!');
+          } else {
+            alert('WARNING: Ollama responded with error code: ' + res.status);
+          }
+        } else {
+          const keyVal = document.getElementById('apiKeyInput').value.trim();
+          const prev = document.getElementById('currentKeyPreview').textContent;
+          if (!keyVal && prev.includes('None configured')) {
+            alert('Please enter a Google Gemini API key to test.');
+          } else {
+            alert('Gemini Cloud configuration is active. Click SAVE & ACTIVATE ENGINE to proceed.');
+          }
+        }
+      } catch (err) {
+        alert('Connection test failed: ' + err.message);
+      }
+    }
+
+    // Keyboard controls
+    document.getElementById('cmdInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitUserCommand();
+      if (e.key === 'Escape' && isListening) cancelVoiceRecognition();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document.getElementById('cmdInput').focus();
+      }
+      // Alt+M: Toggle Voice Push-To-Talk
+      if (e.altKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        togglePushToTalk();
+      }
+      // Alt+H: Toggle Hands-Free Listening Mode
+      if (e.altKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        toggleHandsFreeListening();
+      }
+      if (e.key === 'Escape' && isListening) {
+        cancelVoiceRecognition();
+      }
+    });
+
+    // Initial load
+    refreshStatus();
+    setInterval(refreshStatus, 8000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+Get-ChildItem -Path "$env:TEMP" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue; Write-Output "Temporary Windows cache cleared."

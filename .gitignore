@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+package-lock.json
+
+# Environment variables and API keys
+.env
+
+# Uploads directory (retain directory with .gitkeep, ignore uploaded/generated assets)
+uploads/*
+!uploads/.gitkeep
+
+# Temporary generated scripts & scratch tests
+data/take_screenshot.ps1
+test-launch.js
+test_master.js
+
+# Large binary archives & bundle zips
+*.zip
+public/JARVIS-ULTIMATE.zip
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Logs & temp files
+*.log
+.DS_Store
+Thumbs.db

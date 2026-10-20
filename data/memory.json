@@ -1,0 +1,78 @@
+{
+  "learned_preferences": {
+    "browser_tab_protocol": {
+      "type": "preference",
+      "key": "browser_tab_protocol",
+      "detail": "Always open web links, search queries, and external URLs directly in active new browser tabs.",
+      "learned_at": "2026-10-09T18:13:33.894Z"
+    },
+    "integrated_website_features": {
+      "detail": "User prefers direct website feature integration (like voice commands and gesture vision) directly into the standalone JARVIS Core OS website without separate apps.",
+      "learned_at": "2026-10-06T16:43:42.751Z"
+    },
+    "chat_history_integration_preference": {
+      "detail": "User wants chat history feature to be integrated directly into the standalone website later rather than building a separate one now.",
+      "learned_at": "2026-10-06T18:38:55.039Z"
+    },
+    "academic_workflow": {
+      "type": "preference",
+      "key": "academic_workflow",
+      "detail": "User leverages Google Classroom for academic tracking; prioritize pending coursework, missing tasks, and deadline alerts.",
+      "learned_at": "2026-10-16T18:56:44.848Z"
+    },
+    "email_privacy_protocol": {
+      "type": "preference",
+      "key": "email_privacy_protocol",
+      "detail": "Strict privacy rule enforced: Only access or inspect emails upon explicit command from Sir.",
+      "learned_at": "2026-10-08T17:51:25.659Z"
+    },
+    "whatsapp_privacy_protocol": {
+      "type": "preference",
+      "key": "whatsapp_privacy_protocol",
+      "detail": "Strict privacy rule enforced: Only access or open WhatsApp upon explicit command from Sir.",
+      "learned_at": "2026-10-08T17:17:43.848Z"
+    },
+    "friday_protocol_web_integration": {
+      "detail": "User wants the FRIDAY Protocol (Local Screen Vision & OCR Bridge) integrated directly into the standalone website so JARVIS can capture screenshots directly from the web client or browser interface to read WhatsApp messages, emails, and Google Classroom homework automatically.",
+      "learned_at": "2026-10-07T16:02:10.217Z"
+    },
+    "default_browser": {
+      "detail": "User prefers Chrome as the default browser for all web-related tasks.",
+      "learned_at": "2026-10-08T17:28:30.425Z"
+    }
+  },
+  "learned_heuristics": [
+    {
+      "type": "heuristic",
+      "key": "pattern_system_info",
+      "detail": "System diagnostic and telemetry inquiry execution protocol active.",
+      "learned_at": "2026-10-16T18:32:06.123Z"
+    },
+    {
+      "type": "heuristic",
+      "key": "pattern_generate_pdf",
+      "detail": "Document generation protocol: automatically style, structure, and render downloadable PDF documents.",
+      "learned_at": "2026-10-16T18:33:04.456Z"
+    }
+  ],
+  "custom_skills": {
+    "clean_temp_files": {
+      "name": "clean_temp_files",
+      "description": "Autonomously developed skill to clear temporary Windows caches",
+      "language": "powershell",
+      "file": "data/skills/clean_temp_files.ps1",
+      "created_at": "2026-10-06T16:18:44.669Z",
+      "runs": 0
+    }
+  },
+  "ai_provider": "ollama",
+  "ollama_model": "llama3.2:3b",
+  "execution_stats": {
+    "total_commands": 0,
+    "successful_actions": 0,
+    "skills_created": 1,
+    "evolution_cycles": 0,
+    "last_evolved": "2026-10-20T14:30:00.000Z"
+  },
+  "conversation_history": []
+}
