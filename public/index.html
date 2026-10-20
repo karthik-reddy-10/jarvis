@@ -3698,8 +3698,26 @@
         msg.appendChild(artSec);
       }
 
+      function formatMessageHtml(rawText) {
+        if (!rawText) return '';
+        let safe = escapeHtml(rawText);
+        // Markdown images: ![alt](url)
+        safe = safe.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius:6px; margin:8px 0; border:1px solid var(--cyan); display:block;" />');
+        // Markdown links: [label](url)
+        safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--cyan); font-weight:bold; text-decoration:underline;">$1 ↗</a>');
+        // Raw trycloudflare links
+        safe = safe.replace(/(^|[^"'>])(https?:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com[^\s<]*)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--cyan); font-weight:bold; text-decoration:underline;">$2 ↗</a>');
+        // Bold: **text**
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        // Inline code: `code`
+        safe = safe.replace(/`([^`]+)`/g, '<code style="background:rgba(0,240,255,0.1); color:#38bdf8; padding:2px 4px; border-radius:3px; font-family:var(--font-mono); font-size:0.85em;">$1</code>');
+        // Newlines
+        safe = safe.replace(/\n/g, '<br/>');
+        return safe;
+      }
+
       const content = document.createElement('div');
-      content.textContent = text;
+      content.innerHTML = formatMessageHtml(text);
       msg.appendChild(content);
 
       if (actions && actions.length > 0) {
@@ -3722,8 +3740,8 @@
           }
           card.appendChild(detail);
 
-          // Direct Browser Tab Redirection
-          const targetUrl = act.result?.url || (act.args && act.args.url);
+          // Direct Browser Tab Redirection for Deployments & URLs
+          const targetUrl = act.result?.publicUrl || act.result?.url || (act.args && (act.args.url || act.args.publicUrl));
           if (targetUrl) {
             try {
               window.open(targetUrl, '_blank', 'noopener,noreferrer');

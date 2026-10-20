@@ -153,24 +153,26 @@ const tools = [{
     },
     {
       name: 'build_project',
-      description: 'Build and scaffold a full multi-file website or software project on the PC. Generates all files and directories, and optionally serves/opens it.',
+      description: 'Build and scaffold a full multi-file website or software project on the PC. Generates all files and directories, automatically installs npm dependencies, starts any backend server, and optionally deploys it to a permanent Cloudflare HTTPS public URL accessible worldwide.',
       parameters: {
         type: 'OBJECT',
         properties: {
-          project_dir: { type: 'STRING', description: 'Target directory path (e.g. C:\\Users\\rkart\\Desktop\\my-website)' },
+          project_dir: { type: 'STRING', description: 'Target directory path on the PC (e.g. C:\\Users\\rkart\\Desktop\\my-website)' },
           files: {
             type: 'ARRAY',
             items: {
               type: 'OBJECT',
               properties: {
-                path: { type: 'STRING', description: 'Relative path within the project (e.g., index.html, style.css, app.js)' },
+                path: { type: 'STRING', description: 'Relative path within the project (e.g. index.html, style.css, app.js, server.js, package.json)' },
                 content: { type: 'STRING', description: 'Complete file contents' }
               },
               required: ['path', 'content']
             },
             description: 'Array of all project files'
           },
-          open_in_browser: { type: 'BOOLEAN', description: 'Whether to immediately open the index.html or project in the browser' }
+          port: { type: 'INTEGER', description: 'Optional port number to run server on (e.g. 5000, 8080). Auto-detected if server.js or backend is provided.' },
+          deploy: { type: 'BOOLEAN', description: 'Whether to immediately deploy the website/app to a live permanent Cloudflare HTTPS public URL.' },
+          open_in_browser: { type: 'BOOLEAN', description: 'Whether to immediately open the website or project in the browser' }
         },
         required: ['project_dir', 'files']
       }
@@ -185,6 +187,19 @@ const tools = [{
           content: { type: 'STRING', description: 'Text or code content' }
         },
         required: ['file_path', 'content']
+      }
+    },
+    {
+      name: 'edit_file',
+      description: 'Find and replace a specific snippet of text in an existing file on the PC. Always use this to modify code or fix bugs in existing files.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          file_path: { type: 'STRING', description: 'Absolute path to the file to edit' },
+          target: { type: 'STRING', description: 'The exact string snippet currently in the file to replace' },
+          replacement: { type: 'STRING', description: 'The new string to replace the target with' }
+        },
+        required: ['file_path', 'target', 'replacement']
       }
     },
     {
@@ -577,6 +592,26 @@ async function executeCommand(args) {
   // Fix Windows PowerShell 5.1 syntax error for '&&' (PowerShell 5.1 expects ';')
   commandToRun = commandToRun.replace(/\s+&&\s+/g, '; ');
 
+  // Unwrap redundant powershell -Command "..." wrapping to prevent quote-nesting corruption
+  if (commandToRun.startsWith('powershell -Command "') && commandToRun.endsWith('"')) {
+    commandToRun = commandToRun.slice('powershell -Command "'.length, -1).replace(/\\"/g, '"');
+  } else if (commandToRun.startsWith("powershell -Command '") && commandToRun.endsWith("'")) {
+    commandToRun = commandToRun.slice("powershell -Command '".length, -1);
+  }
+
+  // Handle node -e / node --eval cleanly without PowerShell quote-stripping issues
+  let tempScriptPath = null;
+  const nodeEvalMatch = commandToRun.match(/^\s*node\s+(-e|--eval)\s+(['"])([\s\S]*)\2\s*$/);
+  if (nodeEvalMatch && nodeEvalMatch[3]) {
+    try {
+      tempScriptPath = path.join(os.tmpdir(), `jarvis_eval_${Date.now()}.js`);
+      fsSync.writeFileSync(tempScriptPath, nodeEvalMatch[3], 'utf8');
+      commandToRun = `node "${tempScriptPath}"`;
+    } catch (e) {
+      console.warn('[executeCommand] Temp script write error:', e.message);
+    }
+  }
+
   try {
     const { stdout, stderr } = await execAsync(commandToRun, {
       shell: 'powershell.exe',
@@ -584,6 +619,9 @@ async function executeCommand(args) {
       maxBuffer: 2 * 1024 * 1024,
       cwd: os.homedir()
     });
+    if (tempScriptPath && fsSync.existsSync(tempScriptPath)) {
+      try { fsSync.unlinkSync(tempScriptPath); } catch {}
+    }
     memory.execution_stats.successful_actions++;
     await saveMemory();
     return {
@@ -592,6 +630,9 @@ async function executeCommand(args) {
       stderr: stderr ? stderr.slice(0, 2000) : ''
     };
   } catch (err) {
+    if (tempScriptPath && fsSync.existsSync(tempScriptPath)) {
+      try { fsSync.unlinkSync(tempScriptPath); } catch {}
+    }
     return { success: false, error: err.message.slice(0, 3000) };
   }
 }
@@ -867,19 +908,123 @@ async function buildProject(args) {
       createdFiles.push(file.path);
     }
 
+    // Auto-install dependencies if package.json exists
+    const pkgPath = path.join(projectDir, 'package.json');
+    if (fsSync.existsSync(pkgPath)) {
+      try {
+        console.log(`[buildProject] Installing dependencies for ${projectDir}...`);
+        execSync('npm install --no-audit --prefer-offline', { cwd: projectDir, timeout: 60000 });
+      } catch (err) {
+        console.warn(`[buildProject] npm install warning:`, err.message);
+      }
+    }
+
+    // Determine port and server file
+    let serverFile = null;
+    for (const f of ['server.js', 'app.js', 'index.js']) {
+      const full = path.join(projectDir, f);
+      if (fsSync.existsSync(full) && createdFiles.includes(f)) {
+        const text = fsSync.readFileSync(full, 'utf8');
+        if (text.includes('express') || text.includes('http') || text.includes('listen(') || text.includes('createServer')) {
+          serverFile = f;
+          break;
+        }
+      }
+    }
+
+    let port = args.port;
+    if (!port && serverFile) {
+      const text = fsSync.readFileSync(path.join(projectDir, serverFile), 'utf8');
+      const m = text.match(/PORT\s*=\s*(?:process\.env\.PORT\s*\|\|\s*)?(\d{4,5})/i);
+      if (m) port = parseInt(m[1]);
+      else port = 8080;
+    }
+
+    // If static website (has index.html, no server.js) and deployment or port requested:
+    // Create zero-dependency static server
+    const indexPath = path.join(projectDir, 'index.html');
+    if (!serverFile && fsSync.existsSync(indexPath) && (args.deploy || port)) {
+      if (!port) port = 8080;
+      serverFile = '_jarvis_static_server.js';
+      const staticServerPath = path.join(projectDir, serverFile);
+      if (!fsSync.existsSync(staticServerPath)) {
+        const staticCode = `const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const PORT = ${port};
+const MIME = {
+  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav', '.mp4': 'video/mp4'
+};
+http.createServer((req, res) => {
+  let u = req.url.split('?')[0];
+  let p = path.join(__dirname, u === '/' ? 'index.html' : u);
+  if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
+  if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(p)] || 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*'
+    });
+    fs.createReadStream(p).pipe(res);
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('404 Not Found');
+  }
+}).listen(PORT, '0.0.0.0', () => console.log('[JARVIS WebServer] Running on port ' + PORT));`;
+        fsSync.writeFileSync(staticServerPath, staticCode, 'utf8');
+        createdFiles.push(serverFile);
+      }
+    }
+
+    // Launch server if identified
+    let serverStarted = false;
+    if (serverFile && port) {
+      try {
+        console.log(`[buildProject] Starting server on port ${port} in ${projectDir}...`);
+        const sProc = spawn('node', [serverFile], {
+          cwd: projectDir,
+          detached: true,
+          stdio: 'ignore'
+        });
+        sProc.unref();
+        serverStarted = true;
+        await new Promise(r => setTimeout(r, 1200));
+      } catch (e) {
+        console.error('[buildProject] Server start error:', e);
+      }
+    }
+
+    // Deploy to public URL if requested or port exists
+    let publicDeployment = null;
+    if (args.deploy || (port && args.deploy !== false)) {
+      try {
+        console.log(`[buildProject] Triggering public deployment on port ${port || 8080}...`);
+        publicDeployment = await handleDeployToPublicUrl({ port: port || 8080, projectPath: projectDir });
+      } catch (depErr) {
+        console.warn('[buildProject] Deployment warning:', depErr.message);
+      }
+    }
+
     let opened = false;
     let projectUrl = '';
-    const indexPath = path.join(projectDir, 'index.html');
-    try {
-      await fs.access(indexPath);
+    if (publicDeployment && publicDeployment.publicUrl) {
+      projectUrl = publicDeployment.publicUrl;
+      if (args.open_in_browser !== false) {
+        await launchDesktopTarget(publicDeployment.publicUrl);
+        opened = true;
+      }
+    } else if (fsSync.existsSync(indexPath)) {
       projectUrl = 'file:///' + indexPath.replace(/\\/g, '/');
       if (args.open_in_browser !== false) {
         await launchDesktopTarget(indexPath);
         opened = true;
       }
-    } catch {
+    } else if (port) {
+      projectUrl = `http://localhost:${port}`;
       if (args.open_in_browser !== false) {
-        await launchDesktopTarget(projectDir);
+        await launchDesktopTarget(projectUrl);
         opened = true;
       }
     }
@@ -892,9 +1037,13 @@ async function buildProject(args) {
       project_dir: projectDir,
       created_files: createdFiles,
       url: projectUrl,
+      publicUrl: publicDeployment?.publicUrl || null,
+      port: port || null,
+      server_started: serverStarted,
       open_tab: opened,
       opened_in_browser: opened,
-      message: `Project built successfully with ${createdFiles.length} files at ${projectDir}`
+      message: `Project built successfully with ${createdFiles.length} files at ${projectDir}! ` +
+        (publicDeployment?.publicUrl ? `Permanent live deployment: ${publicDeployment.publicUrl}` : `Local access: ${projectUrl}`)
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -909,6 +1058,39 @@ async function createFile(args) {
     memory.execution_stats.successful_actions++;
     await saveMemory();
     return { success: true, message: `File created at ${fullPath}` };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function editFile(args) {
+  try {
+    const fullPath = path.resolve(args.file_path);
+    if (!fsSync.existsSync(fullPath)) {
+      return { success: false, error: `File not found: ${fullPath}` };
+    }
+    const content = await fs.readFile(fullPath, 'utf-8');
+    const target = args.target;
+    const replacement = args.replacement || '';
+
+    if (!content.includes(target)) {
+      const normContent = content.replace(/\r\n/g, '\n');
+      const normTarget = target.replace(/\r\n/g, '\n');
+      if (normContent.includes(normTarget)) {
+        const newNorm = normContent.replace(normTarget, replacement.replace(/\r\n/g, '\n'));
+        await fs.writeFile(fullPath, newNorm, 'utf-8');
+        memory.execution_stats.successful_actions++;
+        await saveMemory();
+        return { success: true, message: `Successfully edited ${fullPath}` };
+      }
+      return { success: false, error: `Target snippet not found in ${fullPath}. Ensure the target matches existing file content.` };
+    }
+
+    const updated = content.replace(target, replacement);
+    await fs.writeFile(fullPath, updated, 'utf-8');
+    memory.execution_stats.successful_actions++;
+    await saveMemory();
+    return { success: true, message: `Successfully edited ${fullPath}` };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -1063,15 +1245,29 @@ async function handleDeployToPublicUrl(args = {}) {
 
   // Auto-discover desktop project directories if none provided
   if (!projectPath) {
-    const candidates = [
-      path.join(os.homedir(), 'Desktop', 'aetherstream-relay'),
-      path.join(os.homedir(), 'Desktop', 'aetherstream-tab-relay'),
-      path.join(os.homedir(), 'Desktop', 'aetherstream-audio-relay')
-    ];
-    for (const c of candidates) {
-      if (fsSync.existsSync(c)) {
-        projectPath = c;
-        break;
+    const desktop = path.join(os.homedir(), 'Desktop');
+    if (fsSync.existsSync(desktop)) {
+      try {
+        const entries = fsSync.readdirSync(desktop, { withFileTypes: true });
+        const dirCandidates = [];
+        for (const ent of entries) {
+          if (ent.isDirectory()) {
+            const dirFull = path.join(desktop, ent.name);
+            const hasIndex = fsSync.existsSync(path.join(dirFull, 'index.html'));
+            const hasServer = fsSync.existsSync(path.join(dirFull, 'server.js')) || fsSync.existsSync(path.join(dirFull, 'package.json'));
+            if (hasIndex || hasServer) {
+              const stat = fsSync.statSync(dirFull);
+              dirCandidates.push({ path: dirFull, mtime: stat.mtimeMs });
+            }
+          }
+        }
+        dirCandidates.sort((a, b) => b.mtime - a.mtime);
+        if (dirCandidates.length > 0) {
+          projectPath = dirCandidates[0].path;
+          console.log(`[Deploy] Auto-discovered newest project at: ${projectPath}`);
+        }
+      } catch (e) {
+        console.warn('[Deploy] Desktop scan warning:', e.message);
       }
     }
   }
@@ -1101,9 +1297,46 @@ async function handleDeployToPublicUrl(args = {}) {
     }
 
     const serverFile = path.join(projectPath, 'server.js');
+    const staticServerFile = path.join(projectPath, '_jarvis_static_server.js');
+    let targetServer = null;
+
     if (fsSync.existsSync(serverFile)) {
+      targetServer = 'server.js';
+    } else if (fsSync.existsSync(path.join(projectPath, 'index.html'))) {
+      if (!fsSync.existsSync(staticServerFile)) {
+        const staticCode = `const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const PORT = ${port};
+const MIME = {
+  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav', '.mp4': 'video/mp4'
+};
+http.createServer((req, res) => {
+  let u = req.url.split('?')[0];
+  let p = path.join(__dirname, u === '/' ? 'index.html' : u);
+  if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
+  if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(p)] || 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*'
+    });
+    fs.createReadStream(p).pipe(res);
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('404 Not Found');
+  }
+}).listen(PORT, '0.0.0.0', () => console.log('[JARVIS WebServer] Running on port ' + PORT));`;
+        fsSync.writeFileSync(staticServerFile, staticCode, 'utf8');
+      }
+      targetServer = '_jarvis_static_server.js';
+    }
+
+    if (targetServer) {
       try {
-        const sProc = spawn('node', ['server.js'], {
+        const sProc = spawn('node', [targetServer], {
           cwd: projectPath,
           detached: true,
           stdio: 'ignore'
@@ -1842,6 +2075,7 @@ const toolHandlers = {
   open_application: openApplication,
   build_project: buildProject,
   create_file: createFile,
+  edit_file: editFile,
   read_file: readFile,
   list_directory: listDirectory,
   search_web: searchWeb,
@@ -2592,7 +2826,8 @@ Current date: ${new Date().toLocaleString()}, Platform: Windows`;
       'capture_screen', 'open_website', 'open_application', 'execute_command',
       'generate_pdf', 'system_info', 'access_classroom', 'access_drive',
       'browser_navigate', 'browser_solve_lab', 'learn_and_remember',
-      'generate_image', 'build_project', 'access_mail'
+      'generate_image', 'build_project', 'deploy_to_public_url',
+      'create_file', 'edit_file', 'read_file', 'access_mail'
     ];
     const allTools = getOllamaTools();
     ollamaTools = allTools.filter(t => essentialToolNames.includes(t.function?.name));
@@ -2828,6 +3063,13 @@ function extractArtifacts(actions) {
           lines: (f.content || '').split('\n').length
         });
       });
+      if (act.result?.publicUrl) {
+        artifacts.push({
+          type: 'deployment',
+          name: `Live Deployment (${path.basename(act.args.project_dir || 'Web App')})`,
+          url: act.result.publicUrl
+        });
+      }
     } else if (act.tool === 'create_file' && act.args?.file_path) {
       artifacts.push({
         type: 'code',
@@ -2835,6 +3077,14 @@ function extractArtifacts(actions) {
         path: act.args.file_path,
         content: act.args.content ? act.args.content.slice(0, 3000) : '',
         lines: (act.args.content || '').split('\n').length
+      });
+    } else if (act.tool === 'edit_file' && act.args?.file_path) {
+      artifacts.push({
+        type: 'code',
+        name: path.basename(act.args.file_path),
+        path: act.args.file_path,
+        content: act.args.replacement ? act.args.replacement.slice(0, 3000) : '',
+        lines: (act.args.replacement || '').split('\n').length
       });
     } else if (act.tool === 'generate_pdf' && act.result?.filename) {
       artifacts.push({
@@ -3021,21 +3271,32 @@ AUTONOMOUS BROWSER AUTOMATION BRIDGE & LAB PILOT:
   * If the user mentions they opened the lab in another tab or are already logged in, STILL call 'browser_solve_lab'!
   * VERY IMPORTANT: When you call 'browser_solve_lab', it opens a separate managed Chrome window in the background. If the user complains that it's stuck or not clicking Start Lab, it means Google is asking for a password or 2FA in that managed window. You MUST explicitly tell Sir: "Sir, I have opened a separate automated Chrome window. Google is asking for your password or 2-Step Verification in that window. Please bring the new Chrome window to the front, complete the login, and I will automatically resume and complete the lab."
 
-CAPABILITIES:
-1. BUILD WEBSITES & APPS: Use 'build_project' to generate complete, beautiful, modern multi-file projects (HTML5, Tailwind CSS, modern JS, Canvas, React, Python) with safe paths on disk.
-2. BROWSER AUTOMATION & DOM MATRIX: 'browser_navigate', 'browser_click', 'browser_type', 'browser_extract_dom', 'browser_screenshot', 'browser_inject_credentials', 'browser_solve_lab', 'browser_close'.
-3. SYSTEM AUTOMATION & VISION: 'capture_screen' (The FRIDAY Protocol), PowerShell scripts ('execute_command'), open apps ('open_application'), open URLs ('open_website'), explore filesystem ('list_directory', 'read_file', 'create_file').
-4. COMMUNICATIONS & PRODUCTIVITY: 'access_mail', 'access_whatsapp', 'access_classroom', 'access_drive', 'send_message'.
-5. IMAGE GENERATION: Use 'generate_image' when asked to draw, create, or generate a picture or image. You must output the returned markdown ![Generated Image](url) in your final spoken text (the UI will render it).
-6. DOWNLOADABLE PDF GENERATION: Use 'generate_pdf' when Sir asks for a study plan, question paper analysis, summary, report, cheat sheet, or downloadable PDF. Generate comprehensive, beautifully styled HTML with headings, CSS, tables, and bullet points, and call 'generate_pdf' with 'filename' (e.g. "Study_Plan.pdf") and 'htmlContent'. In your final response, ALWAYS include the returned markdown link [📥 Download PDF](url) so Sir can click and download it immediately!
-7. DEPLOY & PUBLIC URLs: When Sir asks you to "deploy", "give me a public url", "make it accessible online", "give me permanent url", or connect devices to a website/app (like AetherStream audio relay on 8080 or JARVIS on 3000):
-   CALL 'deploy_to_public_url' with 'port' (e.g. 8080, 3000)!
-   Do NOT attempt unauthenticated CLI commands like 'surge' or 'npx netlify-cli'. 'deploy_to_public_url' uses Cloudflare Tunnel to provide an instant, worldwide HTTPS URL. In your final response, ALWAYS include the clickable markdown link [🚀 Open Live Web App](publicUrl)!
-8. CONTINUOUS SELF-LEARNING & SELF-TRAINING:
+CAPABILITIES & EXECUTION RULES:
+1. BUILD WEBSITES & APPS (BUILD ANYTHING):
+   - When Sir asks you to create, build, code, or design ANY website, web application, tool, game, dashboard, or relay:
+     ALWAYS use 'build_project' with 'project_dir' (e.g. C:\\Users\\rkart\\Desktop\\<project-name>), 'files' (array of all files with complete code: index.html, styles, scripts, server.js, package.json if needed), and set 'deploy: true'!
+     'build_project' automatically writes all files, runs 'npm install' if package.json is present, starts any backend or static web server on its port, and deploys it to a permanent Cloudflare HTTPS public URL!
+     In your final response, ALWAYS include the clickable markdown link [🚀 Open Live Web App](publicUrl)!
+2. MODIFYING & DEBUGGING CODE:
+   - When Sir asks to fix, edit, update, or debug an existing website or project:
+     FIRST use 'read_file' or 'list_directory' to inspect the existing files.
+     THEN use 'edit_file' to apply fixes with precision (target -> replacement), or 'create_file' to write updated files.
+     NEVER execute ad-hoc PowerShell or 'node -e' scripts to edit code!
+3. DEPLOY & PERMANENT PUBLIC URLs:
+   - When Sir asks to "deploy", "give permanent url", "make it accessible online", or connect other devices to any app:
+     CALL 'deploy_to_public_url' with 'port' (e.g. 8080) and 'projectPath'.
+     'deploy_to_public_url' automatically launches the server (static or Node.js) if not running, establishes a live Cloudflare tunnel, verifies its health, and returns the permanent HTTPS URL.
+     In your final response, ALWAYS include the clickable markdown link [🚀 Open Live Web App](publicUrl)!
+4. BROWSER AUTOMATION & DOM MATRIX: 'browser_navigate', 'browser_click', 'browser_type', 'browser_extract_dom', 'browser_screenshot', 'browser_inject_credentials', 'browser_solve_lab', 'browser_close'.
+5. SYSTEM AUTOMATION & VISION: 'capture_screen' (The FRIDAY Protocol), PowerShell scripts ('execute_command'), open apps ('open_application'), open URLs ('open_website'), explore filesystem ('list_directory', 'read_file', 'create_file', 'edit_file').
+6. COMMUNICATIONS & PRODUCTIVITY: 'access_mail', 'access_whatsapp', 'access_classroom', 'access_drive', 'send_message'.
+7. IMAGE GENERATION: Use 'generate_image' when asked to draw, create, or generate a picture or image. You must output the returned markdown ![Generated Image](url) in your final spoken text (the UI will render it).
+8. DOWNLOADABLE PDF GENERATION: Use 'generate_pdf' when Sir asks for a study plan, question paper analysis, summary, report, cheat sheet, or downloadable PDF. Generate comprehensive, beautifully styled HTML with headings, CSS, tables, and bullet points, and call 'generate_pdf' with 'filename' (e.g. "Study_Plan.pdf") and 'htmlContent'. In your final response, ALWAYS include the returned markdown link [📥 Download PDF](url) so Sir can click and download it immediately!
+9. CONTINUOUS SELF-LEARNING & SELF-TRAINING:
    - When the user tells you a preference, correction, or when you discover a good solution, call 'learn_and_remember' to save it permanently in your knowledge matrix.
    - When asked to create an automated workflow or new capability, write a custom script using 'create_custom_skill'.
    - Call 'execute_custom_skill' to invoke registered skills.
-9. SYSTEM TELEMETRY & CONTROLS: Monitor CPU/RAM/Battery via 'system_info', control processes via 'manage_process', clipboard via 'clipboard_control', set reminders via 'set_reminder'.
+10. SYSTEM TELEMETRY & CONTROLS: Monitor CPU/RAM/Battery via 'system_info', control processes via 'manage_process', clipboard via 'clipboard_control', set reminders via 'set_reminder'.
 
 LEARNED CONTEXT FROM PREVIOUS SESSIONS:
 ${preferencesSummary ? `User Preferences:\n${preferencesSummary}` : 'No saved preferences yet.'}
