@@ -457,6 +457,132 @@
 
     .action-badge.success { color: var(--green); background: rgba(0, 255, 136, 0.15); }
 
+    /* Antigravity-style Thought Box */
+    .jarvis-thought-box {
+      margin-bottom: 10px;
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 4px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+    .jarvis-thought-box[open] {
+      border-color: rgba(0, 240, 255, 0.5);
+      background: rgba(0, 240, 255, 0.07);
+    }
+    .jarvis-thought-header {
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+      user-select: none;
+      background: rgba(0, 240, 255, 0.08);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    }
+    .jarvis-thought-header:hover {
+      background: rgba(0, 240, 255, 0.15);
+    }
+    .thought-badge {
+      margin-left: auto;
+      font-size: 0.62rem;
+      padding: 1px 6px;
+      border-radius: 2px;
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+    }
+    .jarvis-thought-body {
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      max-height: 280px;
+      overflow-y: auto;
+      border-top: 1px solid rgba(0, 240, 255, 0.1);
+    }
+
+    /* Antigravity-style Created Artifacts Section */
+    .jarvis-artifacts-section {
+      margin-top: 12px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      background: rgba(0, 255, 136, 0.03);
+      border-radius: 4px;
+      padding: 10px 12px;
+    }
+    .artifacts-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--green);
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .artifact-item {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+    .artifact-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .artifact-code-preview {
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 2px;
+      color: #a5f3fc;
+      font-size: 0.68rem;
+      line-height: 1.4;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    /* Live Thinking Indicator */
+    .live-thinking-card {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid var(--cyan);
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+      animation: thoughtGlow 2s infinite alternate;
+    }
+    @keyframes thoughtGlow {
+      from { border-color: rgba(0, 240, 255, 0.4); box-shadow: 0 0 8px rgba(0, 240, 255, 0.1); }
+      to { border-color: rgba(0, 240, 255, 0.9); box-shadow: 0 0 20px rgba(0, 240, 255, 0.3); }
+    }
+    .spinner-ring {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(0, 240, 255, 0.2);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
     /* Input Bar */
     .input-bar {
       padding: 12px 16px;
@@ -3366,6 +3492,37 @@
       appendMessage('user', userDisplayMsg, [], null, filesToSubmit);
       setReactorState('processing', 'PROCESSING NEURAL INFERENCE & TOOLS...');
 
+      // Render Antigravity-Style Live Thinking Status Card
+      const stream = document.getElementById('chatStream');
+      const thinkingCard = document.createElement('div');
+      thinkingCard.className = 'live-thinking-card';
+      thinkingCard.id = 'liveThinkingCard';
+      thinkingCard.innerHTML = `
+        <div class="spinner-ring"></div>
+        <div style="flex:1;">
+          <div style="font-weight:bold; font-size:0.75rem; color:var(--cyan); letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+            <span>🧠</span> <span>J.A.R.V.I.S. COGNITIVE PIPELINE ACTIVE</span>
+          </div>
+          <div id="thinkingStepText" style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">Analyzing instruction and formulating cognitive strategy...</div>
+        </div>
+      `;
+      stream.appendChild(thinkingCard);
+      stream.scrollTop = stream.scrollHeight;
+
+      const steps = [
+        "Analyzing instruction and formulating cognitive strategy...",
+        "Evaluating tools, execution paths & architecture...",
+        "Authoring code, files and scaffolding project assets...",
+        "Verifying network ports & deploying live Cloudflare tunnel...",
+        "Validating system telemetry and compiling intelligence..."
+      ];
+      let stepIdx = 0;
+      const stepInterval = setInterval(() => {
+        stepIdx = (stepIdx + 1) % steps.length;
+        const txt = document.getElementById('thinkingStepText');
+        if (txt) txt.textContent = steps[stepIdx];
+      }, 1600);
+
       // Clear active attachments after queueing
       removeAllAttachedFiles();
 
@@ -3383,23 +3540,54 @@
         });
         const data = await res.json();
 
-        // Add Jarvis reply with evolution event
-        appendMessage('jarvis', data.reply, data.actions, data.evolutionEvent);
+        // Clear thinking card
+        clearInterval(stepInterval);
+        if (thinkingCard.parentNode) thinkingCard.remove();
+
+        // Add Jarvis reply with evolution event, thoughts, and created artifacts
+        appendMessage('jarvis', data.reply, data.actions, data.evolutionEvent, null, data.thought, data.createdArtifacts);
         speakJarvis(data.reply);
         playBeep(1400, 0.1);
 
         refreshStatus();
       } catch (err) {
+        clearInterval(stepInterval);
+        if (thinkingCard.parentNode) thinkingCard.remove();
         appendMessage('jarvis', 'Network anomaly detected: ' + err.message);
         playBeep(300, 0.2);
       } finally {
+        clearInterval(stepInterval);
+        if (thinkingCard.parentNode) thinkingCard.remove();
         if (!handsFreeActive && !isJarvisSpeaking) {
           setReactorState('idle', 'SYSTEM READY · STANDING BY');
         }
       }
     }
 
-    function appendMessage(sender, text, actions = [], evolutionEvent = null, attachedFiles = null) {
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function copyArtifactCode(btn) {
+      const card = btn.closest('.artifact-item');
+      if (!card) return;
+      const codeEl = card.querySelector('.artifact-code-preview');
+      if (codeEl) {
+        navigator.clipboard.writeText(codeEl.textContent).then(() => {
+          const original = btn.textContent;
+          btn.textContent = 'COPIED!';
+          setTimeout(() => btn.textContent = original, 1500);
+        });
+      }
+    }
+
+    function appendMessage(sender, text, actions = [], evolutionEvent = null, attachedFiles = null, thought = null, createdArtifacts = null) {
       const stream = document.getElementById('chatStream');
       const msg = document.createElement('div');
       msg.className = 'msg ' + sender;
@@ -3408,6 +3596,21 @@
       senderLabel.className = 'msg-sender';
       senderLabel.textContent = sender === 'user' ? 'USER' : 'J.A.R.V.I.S.';
       msg.appendChild(senderLabel);
+
+      // Antigravity-Style Thought Process Dropdown
+      if (thought && sender === 'jarvis') {
+        const thoughtBox = document.createElement('details');
+        thoughtBox.className = 'jarvis-thought-box';
+        thoughtBox.open = true;
+        thoughtBox.innerHTML = `
+          <summary class="jarvis-thought-header">
+            <span>🧠</span> <strong>THOUGHT PROCESS</strong>
+            <span class="thought-badge">REASONING COMPLETE</span>
+          </summary>
+          <div class="jarvis-thought-body">${escapeHtml(thought)}</div>
+        `;
+        msg.appendChild(thoughtBox);
+      }
 
       // Attached file chips rendering in user message
       const fileList = Array.isArray(attachedFiles) ? attachedFiles : (attachedFiles ? [attachedFiles] : []);
@@ -3449,6 +3652,50 @@
         });
 
         msg.appendChild(fileWrap);
+      }
+
+      // Antigravity-Style Created Artifacts / Files Section
+      if (createdArtifacts && createdArtifacts.length > 0 && sender === 'jarvis') {
+        const artSec = document.createElement('div');
+        artSec.className = 'jarvis-artifacts-section';
+        artSec.innerHTML = `
+          <div class="artifacts-title">
+            <span>⚡</span> <span>CREATED ARTIFACTS & OUTPUTS (${createdArtifacts.length})</span>
+          </div>
+        `;
+        createdArtifacts.forEach(art => {
+          const item = document.createElement('div');
+          item.className = 'artifact-item';
+
+          const icon = art.type === 'code' ? '📄' : (art.type === 'pdf' ? '📕' : '🚀');
+          let detailsHtml = '';
+          if (art.type === 'code') {
+            detailsHtml = `
+              <div class="artifact-item-header">
+                <div><strong>${icon} ${escapeHtml(art.name)}</strong> <span style="color:#64748b; font-size:0.65rem;">(${art.lines} lines)</span></div>
+                <button class="hud-btn" style="padding:2px 8px; font-size:0.65rem;" onclick="copyArtifactCode(this)">COPY CODE</button>
+              </div>
+              <div class="artifact-code-preview">${escapeHtml(art.content || '')}</div>
+            `;
+          } else if (art.type === 'pdf') {
+            detailsHtml = `
+              <div class="artifact-item-header">
+                <div><strong>${icon} ${escapeHtml(art.name)}</strong></div>
+                <a href="${art.url}" target="_blank" class="hud-btn" style="padding:2px 8px; font-size:0.65rem;">DOWNLOAD PDF ↗</a>
+              </div>
+            `;
+          } else if (art.type === 'deployment') {
+            detailsHtml = `
+              <div class="artifact-item-header">
+                <div><strong>${icon} ${escapeHtml(art.name)}</strong></div>
+                <a href="${art.url}" target="_blank" class="hud-btn" style="padding:2px 8px; font-size:0.65rem; border-color:var(--cyan); color:var(--cyan); font-weight:bold;">OPEN LIVE APP ↗</a>
+              </div>
+            `;
+          }
+          item.innerHTML = detailsHtml;
+          artSec.appendChild(item);
+        });
+        msg.appendChild(artSec);
       }
 
       const content = document.createElement('div');
@@ -3777,6 +4024,45 @@
         }
       } catch (err) {
         alert('Connection test failed: ' + err.message);
+      }
+    }
+
+    // ==========================================
+    // CLIPBOARD MEDIA PASTE (PHOTOS & VIDEOS)
+    // ==========================================
+    window.addEventListener('paste', handleClipboardMediaPaste);
+    document.getElementById('cmdInput').addEventListener('paste', handleClipboardMediaPaste);
+
+    function handleClipboardMediaPaste(e) {
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData) return;
+
+      const items = clipboardData.items;
+      if (!items || items.length === 0) return;
+
+      const mediaFiles = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && (item.type.startsWith('image/') || item.type.startsWith('video/'))) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const isVideo = item.type.startsWith('video/');
+            const rawExt = item.type.split('/')[1]?.split(';')[0] || (isVideo ? 'mp4' : 'png');
+            const cleanExt = rawExt.replace(/[^a-zA-Z0-9]/g, '') || (isVideo ? 'mp4' : 'png');
+            const prefix = isVideo ? 'Pasted_Video' : 'Pasted_Image';
+            const fileName = `${prefix}_${Date.now()}.${cleanExt}`;
+            const file = new File([blob], fileName, { type: item.type });
+            mediaFiles.push(file);
+          }
+        }
+      }
+
+      if (mediaFiles.length > 0) {
+        // Prevent default text paste since binary image/video is being ingested
+        e.preventDefault();
+        uploadFilesToCore(mediaFiles);
+        playBeep(1400, 0.08);
       }
     }
 

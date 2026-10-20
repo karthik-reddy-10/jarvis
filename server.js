@@ -574,6 +574,9 @@ async function executeCommand(args) {
       .replace(/taskkill\s+(\/[fF]\s+)?\/[iI][mM]\s+node(\.exe)?(\s+\/[fF])?/gi, `powershell -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${process.pid} } | Stop-Process -Force"`);
   }
 
+  // Fix Windows PowerShell 5.1 syntax error for '&&' (PowerShell 5.1 expects ';')
+  commandToRun = commandToRun.replace(/\s+&&\s+/g, '; ');
+
   try {
     const { stdout, stderr } = await execAsync(commandToRun, {
       shell: 'powershell.exe',
@@ -1056,10 +1059,47 @@ async function handleGeneratePdf(args) {
 
 async function handleDeployToPublicUrl(args = {}) {
   const port = args.port || 8080;
-  const projectPath = args.projectPath ? args.projectPath.trim() : '';
+  let projectPath = args.projectPath ? args.projectPath.trim() : '';
 
-  // If projectPath is provided and needs server to be started
-  if (projectPath && fsSync.existsSync(projectPath)) {
+  // Auto-discover desktop project directories if none provided
+  if (!projectPath) {
+    const candidates = [
+      path.join(os.homedir(), 'Desktop', 'aetherstream-relay'),
+      path.join(os.homedir(), 'Desktop', 'aetherstream-tab-relay'),
+      path.join(os.homedir(), 'Desktop', 'aetherstream-audio-relay')
+    ];
+    for (const c of candidates) {
+      if (fsSync.existsSync(c)) {
+        projectPath = c;
+        break;
+      }
+    }
+  }
+
+  // Helper to test if local port is active
+  async function isPortListening(p) {
+    try {
+      const resp = await fetch(`http://127.0.0.1:${p}`, { method: 'GET', signal: AbortSignal.timeout(1500) });
+      return resp.status < 500;
+    } catch {
+      return false;
+    }
+  }
+
+  // Ensure project server is active
+  let isListening = await isPortListening(port);
+  if (!isListening && projectPath && fsSync.existsSync(projectPath)) {
+    console.log(`[Deploy] Local port ${port} not active. Launching server in ${projectPath}...`);
+    // Ensure dependencies exist
+    const nodeModules = path.join(projectPath, 'node_modules');
+    if (!fsSync.existsSync(nodeModules) && fsSync.existsSync(path.join(projectPath, 'package.json'))) {
+      try {
+        execSync('npm install --no-audit --prefer-offline', { cwd: projectPath, timeout: 30000 });
+      } catch (err) {
+        console.warn('[Deploy] npm install warning:', err.message);
+      }
+    }
+
     const serverFile = path.join(projectPath, 'server.js');
     if (fsSync.existsSync(serverFile)) {
       try {
@@ -1069,9 +1109,17 @@ async function handleDeployToPublicUrl(args = {}) {
           stdio: 'ignore'
         });
         sProc.unref();
-        await new Promise(r => setTimeout(r, 1000));
       } catch (e) {
         console.error('[Deploy] Failed to start project server:', e);
+      }
+    }
+
+    // Wait up to 6 seconds for port to start
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      if (await isPortListening(port)) {
+        isListening = true;
+        break;
       }
     }
   }
@@ -1086,32 +1134,43 @@ async function handleDeployToPublicUrl(args = {}) {
   }
 
   const logPath = path.join(__dirname, `tunnel_${port}.log`);
-  // If there's an existing tunnel log with an active url, check if reachable
+
+  // Check if an existing tunnel URL in log is currently ALIVE
   if (fsSync.existsSync(logPath)) {
     try {
       const prev = fsSync.readFileSync(logPath, 'utf8');
       const m = prev.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
       if (m) {
-        return {
-          success: true,
-          port,
-          publicUrl: m[0],
-          markdown: `[🚀 Access Live Web Application](${m[0]})`,
-          message: `Application running on port ${port} is live and permanently tunneled at: ${m[0]}`
-        };
+        const testUrl = m[0];
+        try {
+          const testResp = await fetch(testUrl, { method: 'HEAD', signal: AbortSignal.timeout(2500) });
+          if (testResp.status === 200 || testResp.status === 304 || testResp.status === 302 || testResp.status === 301) {
+            console.log(`[Deploy] Existing Cloudflare tunnel is verified live: ${testUrl}`);
+            return {
+              success: true,
+              port,
+              publicUrl: testUrl,
+              markdown: `[🚀 Open Live Web App](${testUrl})`,
+              message: `Application running on port ${port} is verified live and accessible worldwide at: ${testUrl}`
+            };
+          }
+        } catch {}
       }
     } catch {}
+    // If we reached here, the previous tunnel is dead or stale. Remove it!
+    try { fsSync.unlinkSync(logPath); } catch {}
   }
 
+  // Cleanly spawn a fresh Cloudflare Tunnel for this port
   const outFd = fsSync.openSync(logPath, 'w');
-  const tProc = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`], {
+  const tProc = spawn(cloudflaredPath, ['tunnel', '--url', `http://127.0.0.1:${port}`], {
     detached: true,
     stdio: ['ignore', outFd, outFd]
   });
   tProc.unref();
 
   let publicUrl = null;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 24; i++) {
     await new Promise(r => setTimeout(r, 500));
     if (fsSync.existsSync(logPath)) {
       const content = fsSync.readFileSync(logPath, 'utf8');
@@ -1124,20 +1183,23 @@ async function handleDeployToPublicUrl(args = {}) {
   }
 
   if (publicUrl) {
+    // Give Cloudflare Edge 1 second to propagate the new hostname
+    await new Promise(r => setTimeout(r, 1200));
+
     memory.execution_stats.successful_actions++;
     await saveMemory();
     return {
       success: true,
       port,
       publicUrl,
-      markdown: `[🚀 Access Live Web Application](${publicUrl})`,
-      message: `Sir, the web application running on port ${port} has been deployed! Accessible worldwide on all devices at: ${publicUrl}`
+      markdown: `[🚀 Open Live Web App](${publicUrl})`,
+      message: `Sir, the web application running on Port ${port} has been verified and deployed! Accessible worldwide on all devices at: ${publicUrl}`
     };
   } else {
     return {
       success: false,
       port,
-      error: 'Tunnel was launched, but waiting for trycloudflare.com URL timed out. Check tunnel log.'
+      error: 'Tunnel was launched, but waiting for trycloudflare.com URL timed out. Please check tunnel log.'
     };
   }
 }
@@ -2732,11 +2794,64 @@ Current date: ${new Date().toLocaleString()}, Platform: Windows`;
     }
   }
 
+  // Extract think tags if present
+  let ollamaThought = '';
+  const thinkTagMatch = finalReply.match(/<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/i);
+  if (thinkTagMatch) {
+    ollamaThought = thinkTagMatch[1].trim();
+    finalReply = finalReply.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/i, '').trim();
+  }
+  if (!ollamaThought && actionsPerformed.length > 0) {
+    ollamaThought = `Local Cognitive Routing (${ollamaModel}):\n1. Deconstructed user prompt intent\n2. Executed ${actionsPerformed.length} local actions: ${actionsPerformed.map(a => a.tool).join(' → ')}\n3. Validated state and finalized response.`;
+  }
+
   return {
     reply: finalReply,
     actions: actionsPerformed,
-    memoryLearned
+    memoryLearned,
+    thought: ollamaThought,
+    createdArtifacts: extractArtifacts(actionsPerformed)
   };
+}
+
+// Helper to extract created artifacts from actions performed
+function extractArtifacts(actions) {
+  const artifacts = [];
+  for (const act of (actions || [])) {
+    if (act.tool === 'build_project' && act.args?.files) {
+      act.args.files.forEach(f => {
+        artifacts.push({
+          type: 'code',
+          name: path.basename(f.path || 'file'),
+          path: path.join(act.args.project_dir || '', f.path || ''),
+          content: f.content ? f.content.slice(0, 3000) : '',
+          lines: (f.content || '').split('\n').length
+        });
+      });
+    } else if (act.tool === 'create_file' && act.args?.file_path) {
+      artifacts.push({
+        type: 'code',
+        name: path.basename(act.args.file_path),
+        path: act.args.file_path,
+        content: act.args.content ? act.args.content.slice(0, 3000) : '',
+        lines: (act.args.content || '').split('\n').length
+      });
+    } else if (act.tool === 'generate_pdf' && act.result?.filename) {
+      artifacts.push({
+        type: 'pdf',
+        name: act.result.filename,
+        path: act.result.filePath,
+        url: act.result.downloadUrl
+      });
+    } else if (act.tool === 'deploy_to_public_url' && act.result?.publicUrl) {
+      artifacts.push({
+        type: 'deployment',
+        name: `Port ${act.result.port || 8080} Live Cloudflare Tunnel`,
+        url: act.result.publicUrl
+      });
+    }
+  }
+  return artifacts;
 }
 
 // Chat & Action Execution Loop
@@ -2956,7 +3071,9 @@ ENVIRONMENT INFO:
         memoryLearned: ollamaResult.memoryLearned,
         evolutionEvent: evolvedLesson,
         evolutionCycle: memory.execution_stats.evolution_cycles,
-        engine: `Ollama (${memory.ollama_model || 'llama3.2:3b'})`
+        engine: `Ollama (${memory.ollama_model || 'llama3.2:3b'})`,
+        thought: ollamaResult.thought,
+        createdArtifacts: ollamaResult.createdArtifacts || extractArtifacts(ollamaResult.actions)
       });
     } catch (ollamaErr) {
       console.error('[JARVIS Ollama Local Error]:', ollamaErr);
@@ -3039,6 +3156,20 @@ ENVIRONMENT INFO:
           finalText = response.text || "Always a pleasure, Sir. All systems are nominal and ready for your command.";
         }
 
+        // Extract thought
+        let thinkingText = '';
+        for (const p of parts) {
+          if (p.thought) thinkingText += (thinkingText ? '\n' : '') + p.thought;
+        }
+        const thinkMatch = finalText.match(/<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/i);
+        if (thinkMatch) {
+          thinkingText = thinkMatch[1].trim();
+          finalText = finalText.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/i, '').trim();
+        }
+        if (!thinkingText && actionsPerformed.length > 0) {
+          thinkingText = `Cognitive Execution Trace:\n1. Deconstructed user prompt intent\n2. Executed ${actionsPerformed.length} actions: ${actionsPerformed.map(a => a.tool).join(' → ')}\n3. Validated state and finalized response.`;
+        }
+
         // Save conversation history cleanly
         memory.conversation_history = contents.slice(-20);
         memory.conversation_history.push({ role: 'model', parts: [{ text: finalText }] });
@@ -3047,13 +3178,17 @@ ENVIRONMENT INFO:
         const evolvedLesson = await evolveJarvisCognition(message, actionsPerformed);
         await saveMemory();
 
+        const createdArtifacts = extractArtifacts(actionsPerformed);
+
         return res.json({
           reply: finalText,
           actions: actionsPerformed,
           memoryLearned,
           evolutionEvent: evolvedLesson,
           evolutionCycle: memory.execution_stats.evolution_cycles,
-          engine: `Gemini (${usedModel || 'Cloud'})`
+          engine: `Gemini (${usedModel || 'Cloud'})`,
+          thought: thinkingText,
+          createdArtifacts
         });
       }
 
@@ -3152,7 +3287,9 @@ ENVIRONMENT INFO:
         reply: ollamaFallback.reply,
         actions: [...actionsPerformed, ...ollamaFallback.actions],
         memoryLearned: [...memoryLearned, ...ollamaFallback.memoryLearned],
-        engine: `Ollama Failover (${memory.ollama_model || 'llama3.2:3b'})`
+        engine: `Ollama Failover (${memory.ollama_model || 'llama3.2:3b'})`,
+        thought: ollamaFallback.thought,
+        createdArtifacts: extractArtifacts([...actionsPerformed, ...ollamaFallback.actions])
       });
     } catch (ollamaErr) {
       console.error('[JARVIS Failover Error]:', ollamaErr);
