@@ -565,8 +565,17 @@ const tools = [{
 async function executeCommand(args) {
   memory.execution_stats.total_commands++;
   const timeout = args.timeout_ms || 35000;
+  let commandToRun = (args.command || '').trim();
+
+  // Safeguard: Prevent JARVIS from killing its own server process
+  if (/(stop-process|taskkill|killall|pkill).*(node(\.exe)?)/i.test(commandToRun)) {
+    commandToRun = commandToRun
+      .replace(/stop-process\s+(-name\s+)?node(\.exe)?(\s+-force)?/gi, `Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${process.pid} } | Stop-Process -Force`)
+      .replace(/taskkill\s+(\/[fF]\s+)?\/[iI][mM]\s+node(\.exe)?(\s+\/[fF])?/gi, `powershell -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${process.pid} } | Stop-Process -Force"`);
+  }
+
   try {
-    const { stdout, stderr } = await execAsync(args.command, {
+    const { stdout, stderr } = await execAsync(commandToRun, {
       shell: 'powershell.exe',
       timeout,
       maxBuffer: 2 * 1024 * 1024,
@@ -1227,6 +1236,10 @@ async function manageProcess(args) {
       const { stdout } = await execAsync('Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Name, Id, CPU, @{Name="RAM_MB";Expression={[math]::Round($_.WorkingSet/1MB,1)}} | ConvertTo-Json', { shell: 'powershell.exe', timeout: 8000 });
       return { success: true, processes: JSON.parse(stdout) };
     } else if (args.action === 'kill' && args.process_name) {
+      if (args.process_name.toLowerCase().includes('node')) {
+        await execAsync(`Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${process.pid} } | Stop-Process -Force`, { shell: 'powershell.exe' });
+        return { success: true, message: `Terminated background node processes while preserving JARVIS core.` };
+      }
       await execAsync(`Stop-Process -Name "${args.process_name}" -Force`, { shell: 'powershell.exe' });
       return { success: true, message: `Terminated process: ${args.process_name}` };
     }
