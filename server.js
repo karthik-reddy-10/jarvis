@@ -1871,6 +1871,7 @@ app.get('/api/engine/status', async (req, res) => {
   res.json({
     currentProvider: memory.ai_provider || 'ollama',
     currentOllamaModel: memory.ollama_model || 'llama3.2:3b',
+    currentGeminiModel: memory.gemini_model || 'gemini-4-argon',
     hasGeminiKey: !!currentKey,
     geminiKeyPreview: currentKey ? `${currentKey.slice(0, 6)}...${currentKey.slice(-4)}` : '',
     ollamaOnline: ollama.online,
@@ -1880,13 +1881,16 @@ app.get('/api/engine/status', async (req, res) => {
 
 // Switch AI Engine or Update Configuration
 app.post('/api/engine/select', async (req, res) => {
-  const { provider, ollamaModel, apiKey } = req.body;
+  const { provider, ollamaModel, geminiModel, apiKey } = req.body;
 
   if (provider === 'gemini' || provider === 'ollama') {
     memory.ai_provider = provider;
   }
   if (ollamaModel && typeof ollamaModel === 'string' && ollamaModel.trim()) {
     memory.ollama_model = ollamaModel.trim();
+  }
+  if (geminiModel && typeof geminiModel === 'string' && geminiModel.trim()) {
+    memory.gemini_model = geminiModel.trim();
   }
   if (apiKey && typeof apiKey === 'string' && apiKey.trim()) {
     API_KEY = apiKey.trim();
@@ -1901,8 +1905,9 @@ app.post('/api/engine/select', async (req, res) => {
     success: true,
     provider: memory.ai_provider,
     ollamaModel: memory.ollama_model,
+    geminiModel: memory.gemini_model || 'gemini-4-argon',
     hasApiKey: !!(process.env.GOOGLE_API_KEY || API_KEY),
-    message: `Active AI Engine switched to: ${memory.ai_provider === 'ollama' ? `Ollama (${memory.ollama_model})` : 'Google Gemini Cloud'}`
+    message: `Active AI Engine switched to: ${memory.ai_provider === 'ollama' ? `Ollama (${memory.ollama_model})` : `Google Gemini (${memory.gemini_model || 'gemini-4-argon'})`}`
   });
 });
 
@@ -2827,8 +2832,10 @@ ENVIRONMENT INFO:
   // ── GOOGLE GEMINI CLOUD INFERENCE ──
   try {
     let iterations = 8;
-    const modelsToTry = [
-      process.env.GEMINI_MODEL,
+    const requestedModel = req.body?.geminiModel || memory.gemini_model || process.env.GEMINI_MODEL || 'gemini-4-argon';
+    const modelsToTry = Array.from(new Set([
+      requestedModel,
+      'gemini-4-argon',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
@@ -2837,7 +2844,9 @@ ENVIRONMENT INFO:
       'gemini-3.8-flash',
       'gemini-3.7-flash',
       'gemini-3.1-flash-lite'
-    ].filter(Boolean);
+    ].filter(Boolean)));
+
+    let usedModel = null;
 
     while (iterations-- > 0) {
       let response = null;
@@ -2857,7 +2866,10 @@ ENVIRONMENT INFO:
                 maxOutputTokens: 8000
               }
             });
-            if (response) break;
+            if (response) {
+              usedModel = m;
+              break;
+            }
           } catch (err) {
             lastErr = err;
             attempts++;
@@ -2901,7 +2913,8 @@ ENVIRONMENT INFO:
           actions: actionsPerformed,
           memoryLearned,
           evolutionEvent: evolvedLesson,
-          evolutionCycle: memory.execution_stats.evolution_cycles
+          evolutionCycle: memory.execution_stats.evolution_cycles,
+          engine: `Gemini (${usedModel || 'Cloud'})`
         });
       }
 

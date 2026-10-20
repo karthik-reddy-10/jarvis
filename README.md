@@ -20,9 +20,10 @@
   - Optimized streaming client (`callOllamaStream`) with an activity-based token watchdog—immune to HTTP headers timeouts and long generation limits.
   - VRAM-conscious context window management (`num_ctx: 3072–4096`) keeping model execution 100% on GPU without spilling into system RAM.
 - **Google Gemini Cloud Engine**:
+  - Frontier support for **Google DeepMind's flagship reasoning & coding model `gemini-4-argon`** alongside `gemini-3.6-flash`, `gemini-3.5-flash`, and `gemini-3.5-flash-lite`.
   - Full multimodal understanding via official `@google/genai` SDK.
   - **Automatic Seamless Failover**: If Gemini cloud quota is exhausted (HTTP 429) or token limits are exceeded, J.A.R.V.I.S. automatically fails over to the local Ollama engine without throwing errors to the user.
-- **Live In-HUD Engine Switcher**: Toggle engines, select models, or update API keys dynamically from the Iron Man HUD.
+- **Live In-HUD Engine Switcher**: Toggle engines, select models (Ollama: `llama3.2:3b`, `qwen2.5-coder:7b`, `llava:7b`; Gemini: `gemini-4-argon`, `gemini-3.6-flash`, `gemini-3.5-flash`), or update API keys dynamically from the Iron Man HUD.
 
 ### 🌐 2. Autonomous Browser Pilot & Google Skills Lab Auto-Pilot
 - Programmatic Puppeteer-core integration controlling Chrome, Edge, or Brave:

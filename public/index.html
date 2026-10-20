@@ -1513,6 +1513,16 @@
       <!-- Gemini Settings Section -->
       <div id="geminiConfigSection" style="margin-bottom: 16px;">
         <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan); margin-bottom: 6px;">
+          SELECT GEMINI MODEL:
+        </label>
+        <select id="geminiModelSelect" class="cmd-input" style="width: 100%; cursor: pointer; margin-bottom: 12px;">
+          <option value="gemini-4-argon">gemini-4-argon (Google DeepMind Flagship Reasoning &amp; Coding · Frontier)</option>
+          <option value="gemini-3.6-flash">gemini-3.6-flash (Fast, Multimodal Cloud · Default)</option>
+          <option value="gemini-3.5-flash">gemini-3.5-flash (Balanced Production)</option>
+          <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ultra-low Latency)</option>
+        </select>
+
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan); margin-bottom: 6px;">
           GOOGLE GEMINI API KEY:
         </label>
         <div style="position: relative;">
@@ -3565,7 +3575,8 @@
               engBtn.classList.add('green-active');
             }
           } else {
-            if (engLabel) engLabel.textContent = eng.hasGeminiKey ? 'GEMINI CLOUD ✓' : 'GEMINI (NO KEY)';
+            const shortModel = (eng.currentGeminiModel || 'gemini-4-argon').replace('gemini-', '').toUpperCase();
+            if (engLabel) engLabel.textContent = eng.hasGeminiKey ? `GEMINI: ${shortModel} ✓` : 'GEMINI (NO KEY)';
             if (engIcon) engIcon.textContent = '⚡';
             if (engBtn) {
               engBtn.classList.remove('green-active');
@@ -3618,8 +3629,9 @@
     }
 
     // AI Engine Configuration & Switching Matrix
-    let activeAiProvider = 'ollama';
+    let activeAiProvider = 'gemini';
     let activeOllamaModel = 'llama3.2:3b';
+    let activeGeminiModel = 'gemini-4-argon';
 
     function selectEngineOption(prov) {
       activeAiProvider = prov;
@@ -3662,7 +3674,13 @@
 
         activeAiProvider = data.currentProvider || 'gemini';
         activeOllamaModel = data.currentOllamaModel || 'llama3.2:3b';
+        activeGeminiModel = data.currentGeminiModel || 'gemini-4-argon';
         selectEngineOption(activeAiProvider);
+
+        const gSel = document.getElementById('geminiModelSelect');
+        if (gSel && activeGeminiModel) {
+          gSel.value = activeGeminiModel;
+        }
 
         if (data.geminiKeyPreview) {
           document.getElementById('currentKeyPreview').textContent = `Current Key: ${data.geminiKeyPreview}`;
@@ -3709,12 +3727,15 @@
 
     async function saveEngineConfig() {
       const newKey = document.getElementById('apiKeyInput').value.trim();
-      const sel = document.getElementById('ollamaModelSelect');
-      const selectedOllama = sel ? sel.value : activeOllamaModel;
+      const selOll = document.getElementById('ollamaModelSelect');
+      const selGem = document.getElementById('geminiModelSelect');
+      const selectedOllama = selOll ? selOll.value : activeOllamaModel;
+      const selectedGemini = selGem ? selGem.value : activeGeminiModel;
 
       const payload = {
         provider: activeAiProvider,
-        ollamaModel: selectedOllama
+        ollamaModel: selectedOllama,
+        geminiModel: selectedGemini
       };
       if (newKey) {
         payload.apiKey = newKey;
@@ -3729,7 +3750,7 @@
         const data = await res.json();
         closeKeyModal();
         await refreshStatus();
-        appendMessage('jarvis', `System configuration updated, Sir. Active cognition engine switched to: ${data.provider === 'ollama' ? `Ollama (${data.ollamaModel}) [100% Offline]` : 'Google Gemini Cloud'}.`);
+        appendMessage('jarvis', `System configuration updated, Sir. Active cognition engine switched to: ${data.provider === 'ollama' ? `Ollama (${data.ollamaModel}) [100% Offline]` : `Google Gemini (${data.geminiModel || 'gemini-4-argon'})`}.`);
         speakJarvis(`Cognition engine activated.`);
       } catch (err) {
         alert('Error saving engine configuration: ' + err.message);

@@ -65,7 +65,8 @@
       "runs": 0
     }
   },
-  "ai_provider": "ollama",
+  "ai_provider": "gemini",
+  "gemini_model": "gemini-4-argon",
   "ollama_model": "llama3.2:3b",
   "execution_stats": {
     "total_commands": 0,
